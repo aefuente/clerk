@@ -16,10 +16,5 @@ pub fn main() !void {
         }
     };
     defer args.deinit(gpa);
-
-    std.debug.print("action: {any}\n", .{args});
-
-
-
 }
 

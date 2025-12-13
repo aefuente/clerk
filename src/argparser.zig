@@ -6,8 +6,8 @@ pub const Args = struct {
     arg_buf: [][:0]u8,
     action: action,
     target: []u8,
-    description: []u8,
-    issue_type: issueType,
+    description: ?[]u8,
+    issue_type: ?issueType,
 
     pub fn init(allocator: Allocator) !Args {
         const command_args = try std.process.argsAlloc(allocator);
@@ -17,8 +17,8 @@ pub const Args = struct {
             .arg_buf = command_args,
             .action = undefined,
             .target = undefined,
-            .description = undefined,
-            .issue_type = undefined,
+            .description = null,
+            .issue_type = null,
         };
 
         try args.parse();
