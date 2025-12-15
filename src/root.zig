@@ -7,6 +7,26 @@ const Allocator = std.mem.Allocator;
 const TIME_STR_LENGTH = 16;
 
 pub const args = @import("argparser.zig");
+pub const issue = @import("issue.zig");
+
+fn isClerkId(value: []const u8) bool {
+    if (value.len != 15) return false;
+
+    var idx: usize = 0;
+    while (idx < 8) : (idx += 1) {
+        if (! std.ascii.isDigit(value[idx])) { return false;}
+    }
+
+    if (value[idx] != '-') {return false;}
+    idx +=1;
+
+    while (idx < 15) : (idx += 1) {
+        if (! std.ascii.isDigit(value[idx])) { return false;}
+    }
+
+    return true;
+}
+
 
 pub const Clerk = struct {
     wd: Dir,
@@ -21,12 +41,44 @@ pub const Clerk = struct {
         self.wd.close();
     }
 
-    pub fn openIssue(self: *Clerk, arg: *args.Args) !void {
-        _ = arg;
+    pub fn getIssueList(self: *Clerk, allocator: Allocator) ![]issue.Issue {
+        var issue_list = try std.ArrayList(issue.Issue).initCapacity(allocator, 10);
+        var dir_iterator = self.wd.iterate();
+        while (try dir_iterator.next()) |entry | {
+            if (entry.kind == .directory and isClerkId(entry.name)) {
+                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, "issue.ini"});
+                defer allocator.free(file_path);
+                const file = try self.wd.openFile(file_path, .{.mode = .read_only});
+                const new_issue = try issue.readIssue(allocator, file);
+                try issue_list.append(allocator, new_issue);
+            }else {
+                break;
+            }
+        }
+        return issue_list.toOwnedSlice(allocator);
+    }
+
+    pub fn openIssue(self: *Clerk, arg: args.Args) ![]const u8 {
         var id_buf: [TIME_STR_LENGTH]u8 = undefined;
 
         const id = getTime(&id_buf);
         try self.wd.makeDir(id);
+        var issue_dir = try self.wd.openDir(id, .{});
+        defer issue_dir.close();
+        const new_issue = issue.Issue{
+            .title = arg.target orelse return error.NoTitle,
+            .description = arg.description orelse "",
+            .issue_type = arg.issue_type orelse issue.IssueType.feature,
+            .status = issue.IssueStatus.open,
+        };
+
+        var issue_buf: [1024]u8 = undefined;
+        var issue_file = try issue_dir.createFile("issue.ini", .{});
+        defer issue_file.close();
+        var issue_writer = issue_file.writer(&issue_buf);
+        try issue.writeIssue(&issue_writer.interface, new_issue);
+
+        return id;
     }
 };
 

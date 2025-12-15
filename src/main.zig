@@ -22,7 +22,7 @@ pub fn main() !void {
 
     switch (args.action) {
         .open => {
-            try tracker.openIssue(&args);
+            _ = try tracker.openIssue(args);
         },
         .close => {
 
@@ -34,7 +34,9 @@ pub fn main() !void {
 
         },
         .list => {
-
-        }
+            const list = try tracker.getIssueList(gpa);
+            defer gpa.free(list);
+            std.debug.print("any: {any}\n", .{list});
+        },
     }
 }
