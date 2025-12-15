@@ -1,14 +1,32 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const metadata_fields = [_][]const u8 {"title", "type", "status"};
-
-
 pub const Issue = struct {
     title: []u8,
     issue_type: IssueType,
     status: IssueStatus,
-    description: []u8,
+    description: ?[]u8,
+
+    pub fn print(self: Issue) !void {
+        var stdout_buf: [1024]u8 = undefined;
+        var writer = std.fs.File.stdout().writer(&stdout_buf);
+        try writer.interface.print("----------\n", .{});
+        try writer.interface.print("Title:\t\t{s}\n", .{self.title});
+        try writer.interface.print("Type:\t\t{any}\n", .{self.issue_type});
+        try writer.interface.print("Status:\t\t{any}\n", .{self.status});
+        if (self.description) |d| {
+            try writer.interface.print("Description:\t{s}\n", .{d});
+        }
+        try writer.interface.flush();
+
+    }
+
+    pub fn deinit(self: Issue, allocator: Allocator) void {
+        allocator.free(self.title);
+        if (self.description) |d| {
+            allocator.free(d);
+        }
+    }
 };
 
 pub const IssueType = enum {
@@ -28,52 +46,57 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
     var reader = file.reader(&read_buf);
 
     var allocating = std.Io.Writer.Allocating.init(allocator);
-    var metadata_flag = false;
+
     var result = Issue{
-        .description = "",
+        .title = "",
         .issue_type = .feature,
         .status = .open,
-        .title = "",
-
+        .description = null,
     };
+
+    _ = try reader.interface.streamDelimiter(&allocating.writer, '\n');
+    const first_line = allocating.written();
+    if (! std.mem.eql(u8, "---", first_line)) {
+        return error.Parsing;
+    }
+    reader.interface.toss(1);
+    allocating.clearRetainingCapacity();
 
     while (reader.interface.streamDelimiter(&allocating.writer, '\n')) |_| {
         const line = allocating.written();
-        if (! metadata_flag and std.mem.eql(u8, "---", line)) {
-            metadata_flag = true;
-            allocating.clearRetainingCapacity();
+
+        if (std.mem.eql(u8, "---", line)) {
             reader.interface.toss(1);
-            continue;
-        }
-        if (metadata_flag and std.mem.eql(u8, "---", line)) {
-            metadata_flag = false;
             allocating.clearRetainingCapacity();
-            reader.interface.toss(1);
-            continue;
+            break;
         }
-        if (metadata_flag) {
-            for (line, 0..) |c, idx| {
-                if (c == ':') {
-                    if (std.mem.eql(u8, line[0..idx], "title")) {
-                        result.title = line[idx+2..];
-                    } else if (std.mem.eql(u8, line[0..idx], "type")) {
-                        result.issue_type = try stringToIssueType(line[idx+2..]);
-                    } else if (std.mem.eql(u8, line[0..idx], "status")) {
-                        result.status = try stringToIssueStatus(line[idx+2..]);
-                    }
-                    break;
+
+        for (line, 0..) |c, idx| {
+            if (c == ':') {
+                if (std.mem.eql(u8, line[0..idx], "title")) {
+                    const owned_title = try allocator.alloc(u8, line[idx+2..].len);
+                    @memcpy(owned_title, line[idx+2..]);
+                    result.title = owned_title;
+                } else if (std.mem.eql(u8, line[0..idx], "type")) {
+                    result.issue_type = try stringToIssueType(line[idx+2..]);
+                } else if (std.mem.eql(u8, line[0..idx], "status")) {
+                    result.status = try stringToIssueStatus(line[idx+2..]);
                 }
+                break;
             }
         }
-        allocating.clearRetainingCapacity();
         reader.interface.toss(1);
-    }else |err | switch (err) {
-        error.EndOfStream => { },
-        else => { 
-            std.debug.print("{any}\n", .{err});
-            return err;
-        }
+        allocating.clearRetainingCapacity();
+    }else |err |{
+        return err;
     }
+    const len = try reader.interface.streamRemaining(&allocating.writer);
+    if (len == 0) {
+        allocating.deinit();
+        return result;
+    }
+
+    result.description = try allocating.toOwnedSlice();
     return result;
 }
 
@@ -92,8 +115,9 @@ pub fn writeIssue(writer: *std.Io.Writer, issue: Issue) !void {
     }
 
     _ = try writer.write("---\n");
-    _ = try writer.write(issue.description);
-    _ = try writer.write("\n");
+    if (issue.description) |d| {
+        _ = try writer.write(d);
+    } 
     try writer.flush();
 }
 

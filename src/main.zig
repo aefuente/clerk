@@ -34,9 +34,17 @@ pub fn main() !void {
 
         },
         .list => {
-            const list = try tracker.getIssueList(gpa);
-            defer gpa.free(list);
-            std.debug.print("any: {any}\n", .{list});
+            const issues = try tracker.getIssueList(gpa);
+            for (issues) | issue| {
+                if (issue.status == .open) {
+                    try issue.print();
+                }
+        }
+
+            for (issues) | l| {
+                l.deinit(gpa);
+            }
+            gpa.free(issues);
         },
     }
 }

@@ -77,7 +77,6 @@ pub const Clerk = struct {
         defer issue_file.close();
         var issue_writer = issue_file.writer(&issue_buf);
         try issue.writeIssue(&issue_writer.interface, new_issue);
-
         return id;
     }
 };
