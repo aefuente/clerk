@@ -41,6 +41,49 @@ pub const Clerk = struct {
         self.wd.close();
     }
 
+    pub fn closeIssue(self: *Clerk, allocator: Allocator, identifier: []const u8) !void {
+        const isId = isClerkId(identifier);
+        var dir_iterator = self.wd.iterate();
+
+        while (try dir_iterator.next()) |entry | {
+            if (isId and entry.kind == .directory and std.mem.eql(u8, entry.name, identifier)) {
+                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, "issue.ini"});
+                defer allocator.free(file_path);
+
+                const file = try self.wd.openFile(file_path, .{.mode = .read_write});
+                defer file.close();
+
+                var new_issue = try issue.readIssue(allocator, file);
+                defer new_issue.deinit(allocator);
+                new_issue.status = .closed;
+
+                try issue.writeIssue(file, new_issue);
+                return;
+            }else if (! isId and entry.kind == .directory){
+                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, "issue.ini"});
+                defer allocator.free(file_path);
+                const file = try self.wd.openFile(file_path, .{.mode = .read_write});
+                defer file.close();
+
+                var new_issue = try issue.readIssue(allocator, file);
+                defer new_issue.deinit(allocator);
+
+                if (new_issue.status == .closed) {
+                    continue;
+                }
+
+                if (std.mem.eql(u8, new_issue.title, identifier)){
+                    new_issue.status = .closed;
+
+                    try issue.writeIssue(file, new_issue);
+                    return;
+                }
+            }
+        }
+        return error.IdentifierNotFound;
+
+    }
+
     pub fn getIssueList(self: *Clerk, allocator: Allocator) ![]issue.Issue {
         var issue_list = try std.ArrayList(issue.Issue).initCapacity(allocator, 10);
         var dir_iterator = self.wd.iterate();
@@ -72,11 +115,9 @@ pub const Clerk = struct {
             .status = issue.IssueStatus.open,
         };
 
-        var issue_buf: [1024]u8 = undefined;
         var issue_file = try issue_dir.createFile("issue.ini", .{});
         defer issue_file.close();
-        var issue_writer = issue_file.writer(&issue_buf);
-        try issue.writeIssue(&issue_writer.interface, new_issue);
+        try issue.writeIssue(issue_file, new_issue);
         return id;
     }
 };

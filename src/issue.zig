@@ -29,6 +29,35 @@ pub const Issue = struct {
     }
 };
 
+pub fn closeIssue(allocator: Allocator, file: std.fs.File) !void {
+    var read_buf: [1024]u8 = undefined;
+    var reader = file.reader(&read_buf);
+    var allocating = std.Io.Writer.Allocating.init(allocator);
+    _ = try reader.interface.streamRemaining(&allocating.writer);
+
+    const issue_data = try allocating.toOwnedSlice();
+
+    var array_list = std.ArrayList(u8).fromOwnedSlice(issue_data);
+    defer array_list.deinit(allocator);
+
+    var idx: usize = 0;
+    while (idx+9 < array_list.items.len) : (idx+=1){
+        if (array_list.items[idx] == '\n' and std.mem.eql(u8, "status: ", array_list.items[idx+1..idx+9])){
+            idx = idx + 9;
+            break;
+        }
+    }
+
+    if (std.mem.eql(u8, array_list.items[idx..idx+4], "open")) {
+        try array_list.replaceRange(allocator, idx, 4, "closed");
+    }
+
+    var write_buf: [1024]u8 = undefined;
+    var writer = file.writer(&write_buf);
+    try writer.interface.writeAll(array_list.items);
+    try writer.interface.flush();
+}
+
 pub const IssueType = enum {
     fix,
     bug,
@@ -100,25 +129,27 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
     return result;
 }
 
-pub fn writeIssue(writer: *std.Io.Writer, issue: Issue) !void {
-    try writer.print("---\ntitle: {s}\n", .{issue.title});
+pub fn writeIssue(file: std.fs.File, issue: Issue) !void {
+    var write_buf: [1024]u8 = undefined;
+    var writer = file.writer(&write_buf);
+    try writer.interface.print("---\ntitle: {s}\n", .{issue.title});
 
     switch (issue.issue_type) {
-        .fix => { _ = try writer.write("type: fix\n"); },
-        .bug => { _ = try writer.write("type: bug\n"); },
-        .chore => { _ = try writer.write("type: chore\n"); },
-        .feature => { _ = try writer.write("type: feature\n"); },
+        .fix => { _ = try writer.interface.write("type: fix\n"); },
+        .bug => { _ = try writer.interface.write("type: bug\n"); },
+        .chore => { _ = try writer.interface.write("type: chore\n"); },
+        .feature => { _ = try writer.interface.write("type: feature\n"); },
     }
     switch (issue.status) {
-        .open => { _ = try writer.write("status: open\n"); },
-        .closed => { _ = try writer.write("status: closed\n"); }
+        .open => { _ = try writer.interface.write("status: open\n"); },
+        .closed => { _ = try writer.interface.write("status: closed\n"); }
     }
 
-    _ = try writer.write("---\n");
+    _ = try writer.interface.write("---\n");
     if (issue.description) |d| {
-        _ = try writer.write(d);
+        _ = try writer.interface.write(d);
     } 
-    try writer.flush();
+    try writer.interface.flush();
 }
 
 pub fn stringToIssueType(value: []const u8) !IssueType{

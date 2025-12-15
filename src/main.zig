@@ -25,7 +25,7 @@ pub fn main() !void {
             _ = try tracker.openIssue(args);
         },
         .close => {
-
+            try tracker.closeIssue(gpa, args.target.?);
         },
         .delete => {
 
