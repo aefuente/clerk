@@ -9,6 +9,8 @@ const TIME_STR_LENGTH = 16;
 pub const args = @import("argparser.zig");
 pub const issue = @import("issue.zig");
 
+const ISSUE_FILE_NAME = "issue.ini";
+
 fn isClerkId(value: []const u8) bool {
     if (value.len != 15) return false;
 
@@ -47,7 +49,7 @@ pub const Clerk = struct {
 
         while (try dir_iterator.next()) |entry | {
             if (isId and entry.kind == .directory and std.mem.eql(u8, entry.name, identifier)) {
-                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, "issue.ini"});
+                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, ISSUE_FILE_NAME});
                 defer allocator.free(file_path);
 
                 const file = try self.wd.openFile(file_path, .{.mode = .read_write});
@@ -60,7 +62,7 @@ pub const Clerk = struct {
                 try issue.writeIssue(file, new_issue);
                 return;
             }else if (! isId and entry.kind == .directory){
-                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, "issue.ini"});
+                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, ISSUE_FILE_NAME});
                 defer allocator.free(file_path);
                 const file = try self.wd.openFile(file_path, .{.mode = .read_write});
                 defer file.close();
@@ -81,6 +83,37 @@ pub const Clerk = struct {
             }
         }
         return error.IdentifierNotFound;
+    }
+
+    pub fn deleteIssue(self: Clerk, allocator: Allocator, identifier: []const u8) !void {
+        const isId = isClerkId(identifier);
+        var dir_iterator = self.wd.iterate();
+
+        while (try dir_iterator.next()) |entry | {
+            if (isId and entry.kind == .directory and std.mem.eql(u8, entry.name, identifier)) {
+                try self.wd.deleteTree(entry.name);
+                return;
+            }else if (! isId and entry.kind == .directory){
+                const file_path = try std.fs.path.join(
+                    allocator, 
+                    &[_][]const u8{
+                        entry.name, 
+                        ISSUE_FILE_NAME
+                });
+                defer allocator.free(file_path);
+                const file = try self.wd.openFile(file_path, .{.mode = .read_write});
+                defer file.close();
+
+                var new_issue = try issue.readIssue(allocator, file);
+                defer new_issue.deinit(allocator);
+
+                if (std.mem.eql(u8, new_issue.title, identifier)){
+                    try self.wd.deleteTree(entry.name);
+                    return;
+                }
+            }
+        }
+        return error.IssueNotFound;
 
     }
 
@@ -89,7 +122,7 @@ pub const Clerk = struct {
         var dir_iterator = self.wd.iterate();
         while (try dir_iterator.next()) |entry | {
             if (entry.kind == .directory and isClerkId(entry.name)) {
-                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, "issue.ini"});
+                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, ISSUE_FILE_NAME});
                 defer allocator.free(file_path);
                 const file = try self.wd.openFile(file_path, .{.mode = .read_only});
                 const new_issue = try issue.readIssue(allocator, file);
@@ -115,7 +148,7 @@ pub const Clerk = struct {
             .status = issue.IssueStatus.open,
         };
 
-        var issue_file = try issue_dir.createFile("issue.ini", .{});
+        var issue_file = try issue_dir.createFile(ISSUE_FILE_NAME, .{});
         defer issue_file.close();
         try issue.writeIssue(issue_file, new_issue);
         return id;

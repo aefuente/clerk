@@ -25,10 +25,20 @@ pub fn main() !void {
             _ = try tracker.openIssue(args);
         },
         .close => {
-            try tracker.closeIssue(gpa, args.target.?);
+            if (args.target) | target| {
+                try tracker.closeIssue(gpa, target);
+            }else {
+                std.debug.print("Missing target for close\n", .{});
+                return error.MissingTarget;
+            }
         },
         .delete => {
-
+            if (args.target) | target| {
+                try tracker.deleteIssue(gpa, target);
+            }else {
+                std.debug.print("Missing target for delete\n", .{});
+                return error.MissingTarget;
+            }
         },
         .edit => {
 
@@ -39,8 +49,7 @@ pub fn main() !void {
                 if (issue.status == .open) {
                     try issue.print();
                 }
-        }
-
+            }
             for (issues) | l| {
                 l.deinit(gpa);
             }
