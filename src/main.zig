@@ -16,5 +16,35 @@ pub fn main() !void {
         }
     };
     defer args.deinit(gpa);
-}
 
+    var tracker = try clerk.Clerk.init();
+    defer tracker.deinit();
+
+    switch (args.action) {
+        .open => {
+            _ = try tracker.openIssue(args);
+        },
+        .close => {
+
+        },
+        .delete => {
+
+        },
+        .edit => {
+
+        },
+        .list => {
+            const issues = try tracker.getIssueList(gpa);
+            for (issues) | issue| {
+                if (issue.status == .open) {
+                    try issue.print();
+                }
+        }
+
+            for (issues) | l| {
+                l.deinit(gpa);
+            }
+            gpa.free(issues);
+        },
+    }
+}

@@ -1,13 +1,15 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const process = std.process;
+const issue = @import("issue.zig");
+const IssueType = issue.IssueType;
 
 pub const Args = struct {
     arg_buf: [][:0]u8,
     action: action,
-    target: []u8,
+    target: ?[]u8,
     description: ?[]u8,
-    issue_type: ?issueType,
+    issue_type: ?IssueType,
 
     pub fn init(allocator: Allocator) !Args {
         const command_args = try std.process.argsAlloc(allocator);
@@ -16,7 +18,7 @@ pub const Args = struct {
         var args = Args{
             .arg_buf = command_args,
             .action = undefined,
-            .target = undefined,
+            .target = null,
             .description = null,
             .issue_type = null,
         };
@@ -54,11 +56,11 @@ pub const Args = struct {
             return error.Help;
         }
 
-        if (self.arg_buf.len < 3) {
-            return error.TooFewArguements;
-        }
-
         self.action = try getAction(self.arg_buf[1]);
+
+        if (self.action == action.list) {
+            return;
+        }
         self.target = self.arg_buf[2][0..self.arg_buf[2].len];
         
         var idx: usize = 3;
@@ -100,11 +102,11 @@ fn getAction(value: [:0]u8) !action {
     return error.BadArgs;
 }
 
-fn getIssueType(value: [:0]u8) !issueType {
-    if (std.mem.eql(u8, value, "fix")) { return issueType.fix; }
-    else if (std.mem.eql(u8, value, "bug")) { return issueType.bug; }
-    else if (std.mem.eql(u8, value, "chore")) { return issueType.chore; }
-    else if (std.mem.eql(u8, value, "feature")) { return issueType.feature; }
+fn getIssueType(value: [:0]u8) !IssueType {
+    if (std.mem.eql(u8, value, "fix")) { return IssueType.fix; }
+    else if (std.mem.eql(u8, value, "bug")) { return IssueType.bug; }
+    else if (std.mem.eql(u8, value, "chore")) { return IssueType.chore; }
+    else if (std.mem.eql(u8, value, "feature")) { return IssueType.feature; }
     return error.BadArgs;
 }
 
@@ -114,13 +116,6 @@ fn isVariable(arg: [:0]const u8) bool {
     }
     return false;
 }
-
-const issueType = enum {
-    fix,
-    bug,
-    chore,
-    feature,
-};
 
 const action = enum {
     open,
