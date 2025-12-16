@@ -27,8 +27,19 @@ pub fn run(allocator: Allocator) !void {
     const term_size = try render.getTerminalSize();
     const result = render.CalculateResult(term_size);
     const preview = render.CalculatePreview(term_size);
-    const search = render.CalculateSearch(term_size);
-    const search_pos = render.searchBounds(term_size);
+    const search = render.Box{
+        .identifier = "Search",
+        .x = result.x,
+        .y = result.y + result.height + 1,
+        .height = 2,
+        .width = result.width,
+    };
+
+    const search_pos = render.SearchDetails{
+        .x = search.x + 2,
+        .y = search.y + 1,
+        .width = search.width-2
+    };
 
     render.DrawBox(result);
     render.DrawBox(preview);

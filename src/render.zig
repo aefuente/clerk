@@ -22,7 +22,7 @@ fn getBoxSize(terminal_size: posix.winsize) BoxDimensions {
     };
 }
 
-const Box = struct {
+pub const Box = struct {
     x: u16,
     y: u16,
     width: u16,
@@ -64,18 +64,6 @@ pub fn CalculateResult(terminal_size: posix.winsize) Box {
     };
 }
 
-pub fn CalculateSearch(terminal_size: posix.winsize) Box {
-
-    return Box {
-        .identifier = "Search",
-        .x = @divFloor(terminal_size.col, 8),
-        .y = 3 * @divFloor(terminal_size.row, 4)+2,
-        .width = @divFloor(terminal_size.col, 2),
-        .height = 2,
-    };
-
-}
-
 pub fn CalculatePreview(terminal_size: posix.winsize) Box {
     return Box{
         .identifier = "Preview",
@@ -91,11 +79,3 @@ pub const SearchDetails = struct {
     y: u16,
     width: u16
 };
-
-pub fn searchBounds(terminal_size: posix.winsize) SearchDetails {
-    return SearchDetails {
-        .x = @divFloor(terminal_size.col, 8) + 2,
-        .y = 3 * @divFloor(terminal_size.row, 4)+3,
-        .width = @divFloor(terminal_size.col, 2)-2,
-    };
-}
