@@ -5,6 +5,7 @@ const c = @cImport(@cInclude("time.h"));
 
 const Allocator = std.mem.Allocator;
 const TIME_STR_LENGTH = 16;
+pub const event = @import("event.zig");
 
 pub const args = @import("argparser.zig");
 pub const issue = @import("issue.zig");

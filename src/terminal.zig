@@ -40,6 +40,7 @@ pub const Terminal = struct {
     }
 
     pub fn close(self: Terminal) void {
+        self.set_cooked();
         self.tty_file.close();
     }
 };

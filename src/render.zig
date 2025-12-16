@@ -3,7 +3,7 @@ const os = std.os;
 const posix = std.posix;
 
 
-fn getTerminalSize() !posix.winsize {
+pub fn getTerminalSize() !posix.winsize {
     var ws: posix.winsize = undefined;
     if (os.linux.ioctl(std.posix.STDOUT_FILENO, os.linux.T.IOCGWINSZ, @intFromPtr(&ws)) != 0) {
         return error.IoctlFailed;
@@ -31,7 +31,7 @@ const Box = struct {
     identifier: ?[]const u8,
 };
 
-fn DrawBox(box: Box) void {
+pub fn DrawBox(box: Box) void {
 
     std.debug.print("\x1b(0", .{});
     std.debug.print("\x1b[{};{}Hl", .{box.y, box.x});
@@ -55,7 +55,7 @@ fn DrawBox(box: Box) void {
     std.debug.print("\x1b(B", .{});
 }
 
-fn calculateResultBox(terminal_size: posix.winsize) Box {
+pub fn CalculateResult(terminal_size: posix.winsize) Box {
     return Box{
         .identifier = "Result",
         .x = @divFloor(terminal_size.col, 8),
@@ -65,7 +65,7 @@ fn calculateResultBox(terminal_size: posix.winsize) Box {
     };
 }
 
-fn CalculateSearch(terminal_size: posix.winsize) Box {
+pub fn CalculateSearch(terminal_size: posix.winsize) Box {
 
     return Box {
         .identifier = "Search",
@@ -76,8 +76,7 @@ fn CalculateSearch(terminal_size: posix.winsize) Box {
     };
 
 }
-fn CalculatePreview(terminal_size: posix.winsize) Box {
-
+pub fn CalculatePreview(terminal_size: posix.winsize) Box {
     return Box{
         .identifier = "Preview",
         .x = @divFloor(terminal_size.col, 8) + 2 + @divFloor(terminal_size.col, 2),
@@ -87,18 +86,19 @@ fn CalculatePreview(terminal_size: posix.winsize) Box {
     };
 }
 
-pub fn render() !void {
-    const term_size = try getTerminalSize();
-    const result_box = calculateResultBox(term_size);
-    const preview_box = CalculatePreview(term_size);
-    const search_box = CalculateSearch(term_size);
-    DrawBox(result_box);
-    DrawBox(preview_box);
-    DrawBox(search_box);
-    std.debug.print("\n", .{});
-}
 
-test "drawLine" {
-    try render();
+
+pub const SearchDetails = struct {
+    x: u16,
+    y: u16,
+    width: u16
+};
+
+pub fn searchBounds(terminal_size: posix.winsize) SearchDetails {
+    return SearchDetails {
+        .x = @divFloor(terminal_size.col, 8) + 2,
+        .y = 3 * @divFloor(terminal_size.row, 4)+3,
+        .width = @divFloor(terminal_size.col, 2)-2,
+    };
 }
 
