@@ -2,7 +2,6 @@ const std = @import("std");
 const os = std.os;
 const posix = std.posix;
 
-
 pub fn getTerminalSize() !posix.winsize {
     var ws: posix.winsize = undefined;
     if (os.linux.ioctl(std.posix.STDOUT_FILENO, os.linux.T.IOCGWINSZ, @intFromPtr(&ws)) != 0) {
@@ -76,6 +75,7 @@ pub fn CalculateSearch(terminal_size: posix.winsize) Box {
     };
 
 }
+
 pub fn CalculatePreview(terminal_size: posix.winsize) Box {
     return Box{
         .identifier = "Preview",
@@ -85,8 +85,6 @@ pub fn CalculatePreview(terminal_size: posix.winsize) Box {
         .height = 3 * @divFloor(terminal_size.row, 4),
     };
 }
-
-
 
 pub const SearchDetails = struct {
     x: u16,
@@ -101,4 +99,3 @@ pub fn searchBounds(terminal_size: posix.winsize) SearchDetails {
         .width = @divFloor(terminal_size.col, 2)-2,
     };
 }
-

@@ -41,6 +41,12 @@ pub fn run(allocator: Allocator) !void {
     term.set_cooked();
 }
 
+pub fn FillSearch(allocator: std.mem.Allocator, stdout: *std.Io.Writer, result_box: render.Box) !void {
+    _ = allocator;
+    _ = stdout;
+    _ = result_box;
+}
+
 pub fn read_search(
     allocator: std.mem.Allocator,
     stdout: *std.Io.Writer,
@@ -132,10 +138,6 @@ fn cleanSearch(writer: *std.Io.Writer, n: usize) !void {
 }
 
 fn draw_line(writer: *std.Io.Writer, line: []const u8, cursor_pos: usize, search_details: render.SearchDetails) !void {
-    // Write our new line
-    // \r -> start at column 0
-    // zell>> {s} -> print our buffer 
-    // \x1b[K clear what might be there from the previous write
     try writer.print("\x1b[{};{}H", .{search_details.y, search_details.x});
     try writer.print("{s}",.{line});
     if (line.len <= search_details.width) {

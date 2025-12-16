@@ -20,7 +20,7 @@ pub fn main() !void {
     var tracker = try clerk.Clerk.init();
     defer tracker.deinit();
 
-    switch (args.action) {
+    if (args.action) |action| switch (action) {
         .open => {
             _ = try tracker.openIssue(args);
         },
@@ -55,5 +55,7 @@ pub fn main() !void {
             }
             gpa.free(issues);
         },
+    } else {
+        try clerk.event.run(gpa);
     }
 }

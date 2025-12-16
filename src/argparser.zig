@@ -6,7 +6,7 @@ const IssueType = issue.IssueType;
 
 pub const Args = struct {
     arg_buf: [][:0]u8,
-    action: action,
+    action: ?action,
     target: ?[]u8,
     description: ?[]u8,
     issue_type: ?IssueType,
@@ -17,7 +17,7 @@ pub const Args = struct {
 
         var args = Args{
             .arg_buf = command_args,
-            .action = undefined,
+            .action = null,
             .target = null,
             .description = null,
             .issue_type = null,
@@ -54,6 +54,10 @@ pub const Args = struct {
             try stdout.interface.flush();
 
             return error.Help;
+        }
+
+        if (self.arg_buf.len <= 1) {
+            return;
         }
 
         self.action = try getAction(self.arg_buf[1]);

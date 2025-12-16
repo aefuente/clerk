@@ -30,7 +30,6 @@ fn isClerkId(value: []const u8) bool {
     return true;
 }
 
-
 pub const Clerk = struct {
     wd: Dir,
 
