@@ -123,7 +123,7 @@ pub const Clerk = struct {
 
     }
 
-    pub fn getIssueList(self: *Clerk, allocator: Allocator) ![]Issue {
+    pub fn getIssues(self: *Clerk, allocator: Allocator) !Issues {
         var issue_list = try std.ArrayList(Issue).initCapacity(allocator, 10);
         var dir_iterator = self.wd.iterate();
         while (try dir_iterator.next()) |entry | {
@@ -131,13 +131,16 @@ pub const Clerk = struct {
                 const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, ISSUE_FILE_NAME});
                 defer allocator.free(file_path);
                 const file = try self.wd.openFile(file_path, .{.mode = .read_only});
+                defer file.close();
                 const new_issue = try readIssue(allocator, file);
                 try issue_list.append(allocator, new_issue);
             }else {
                 break;
             }
         }
-        return issue_list.toOwnedSlice(allocator);
+        return Issues{
+            .items = try issue_list.toOwnedSlice(allocator),
+        };
     }
 
     pub fn openIssue(self: *Clerk, arg: args.Args) ![]const u8 {
@@ -158,6 +161,17 @@ pub const Clerk = struct {
         defer issue_file.close();
         try writeIssue(issue_file, new_issue);
         return id;
+    }
+};
+
+pub const Issues = struct {
+    items: []Issue,
+
+    pub fn deinit(self: Issues, allocator: Allocator) void {
+        for (self.items) |i| {
+            i.deinit(allocator);
+        }
+        allocator.free(self.items);
     }
 };
 

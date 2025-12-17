@@ -25,6 +25,8 @@ pub const Terminal = struct {
         // for writing what the user types to stdout
         raw_settings.lflag.ECHO = false;
 
+        raw_settings.lflag.ISIG = false;
+
         return Terminal{
             .raw_settings = raw_settings,
             .cooked_settings = cooked_settings,

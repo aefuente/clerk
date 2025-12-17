@@ -97,8 +97,8 @@ pub const screen = struct {
         var read_buf: [STDIN_BUF_SIZE]u8 = undefined;
         var stdin = std.fs.File.stdin().reader(&read_buf);
 
-        const issues = try self.clerk.getIssueList(allocator);
-        defer allocator.free(issues);
+        const issues = try self.clerk.getIssues(allocator);
+        defer issues.deinit(allocator);
 
         try self.populateSearch(allocator, array_list.items, issues);
 
@@ -124,6 +124,14 @@ pub const screen = struct {
                 _ = array_list.orderedRemove(self.cursor_pos);
                 try self.populateSearch(allocator, array_list.items, issues);
                 try draw_line(self.stdout, array_list.items, self.cursor_pos, self.search_bounds);
+            }
+
+
+            else if (c == CTRL_C) {
+                try self.stdout.print("\x1b[2J\x1b[H", .{});
+                try self.stdout.flush();
+
+                return;
             }
 
             else if (c == '\n') {
@@ -188,18 +196,18 @@ pub const screen = struct {
         }
     }
 
-    pub fn populateSearch(self: *screen, allocator: Allocator, query: []const u8, issues: []issue.Issue) !void {
+    pub fn populateSearch(self: *screen, allocator: Allocator, query: []const u8, issues: issue.Issues) !void {
         try self.search(allocator, query, issues);
         self.print_search();
     }
 
-    pub fn search(self: *screen, allocator: Allocator, query: []const u8, issues: []issue.Issue) !void{
+    pub fn search(self: *screen, allocator: Allocator, query: []const u8, issues: issue.Issues) !void{
         allocator.free(self.search_result);
         if (query.len == 0) {
-            self.search_result = try allocator.alloc(issue.Issue, issues.len);
-            @memcpy(self.search_result, issues);
+            self.search_result = try allocator.alloc(issue.Issue, issues.items.len);
+            @memcpy(self.search_result, issues.items);
         }else {
-            self.search_result = try fuzzy.filterAndSort(allocator, query, issues, 30);
+            self.search_result = try fuzzy.filterAndSort(allocator, query, issues.items, 30);
         }
     }
 
