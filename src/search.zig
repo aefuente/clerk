@@ -13,7 +13,7 @@ pub fn filterAndSort(allocator: Allocator, query: []const u8, candidates: []issu
         defer allocator.free(norm_title);
         const s =try scoreTitle(allocator, norm_query, norm_title);
         if (s > threshold) {
-            try tmp.append(allocator, FuzzyMatch{.issue = candidates[idx], .score = s});
+            try tmp.append(allocator, FuzzyMatch{.issue = try issue.Issue.deepCopy(allocator, candidates[idx]), .score = s});
         }
     }
 

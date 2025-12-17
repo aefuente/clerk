@@ -23,8 +23,36 @@ pub fn run(allocator: Allocator) !void {
     var display = try screen.init(allocator, &stdout.interface);
     defer display.deinit(allocator);
     try display.DrawBoxes();
-    try display.userInteraction(allocator);
+    const is = display.userInteraction(allocator) catch |err| switch (err) {
+        error.CleanClose => {
+            return;
+        },
+        else => {
+            return err;
+        }
+    };
 
+    try stdout.interface.print("\x1b[2J\x1b[H", .{});
+    try stdout.interface.flush();
+
+    if (is) |i| {
+
+        const file_path = i.file_path orelse return error.NoFilePath;
+        const file = try toCstr(allocator, file_path);
+        defer allocator.free(file);
+
+        const visual_var = std.posix.getenv("VISUAL");
+        if (visual_var) |editor | {
+            return std.process.execv(allocator, &[_][]const u8{editor, file});
+        }
+
+        const editor_var = std.posix.getenv("EDITOR");
+        if (editor_var) |editor | {
+            return std.process.execv(allocator, &[_][]const u8{editor, file});
+        }
+
+        return error.NoEditor;
+    }
 }
 
 pub const screen = struct {
@@ -88,7 +116,7 @@ pub const screen = struct {
     pub fn userInteraction(
         self: *screen,
         allocator: std.mem.Allocator,
-        ) !void {
+        ) !?issue.Issue {
 
         var array_list = try std.ArrayList(u8).initCapacity(allocator, 10);
         defer array_list.deinit(allocator);
@@ -107,7 +135,6 @@ pub const screen = struct {
 
         self.terminal.set_raw();
         defer self.terminal.set_cooked();
-
 
         while (true) {
 
@@ -131,20 +158,12 @@ pub const screen = struct {
                 try self.stdout.print("\x1b[2J\x1b[H", .{});
                 try self.stdout.flush();
 
-                return;
+                return error.CleanClose;
             }
 
             else if (c == '\n') {
-                var index: usize = array_list.items.len;
 
-                // Remove white spaces
-                while (index > 0) {
-                    index -= 1;
-                    const char = array_list.items[index];
-                    if (char != ' ' and char != '\t' and char != '\r') break;
-                }
-
-                array_list.shrinkAndFree(allocator, index);
+                try self.populateSearch(allocator, array_list.items, issues);
                 break;
             }
             // Escape sequence
@@ -194,6 +213,10 @@ pub const screen = struct {
                 try draw_line(self.stdout, array_list.items, self.cursor_pos, self.search_bounds);
             }
         }
+        if (self.selection_pos < self.search_result.len) {
+            return self.search_result[self.selection_pos];
+        }
+        return null;
     }
 
     pub fn populateSearch(self: *screen, allocator: Allocator, query: []const u8, issues: issue.Issues) !void {
@@ -205,7 +228,9 @@ pub const screen = struct {
         allocator.free(self.search_result);
         if (query.len == 0) {
             self.search_result = try allocator.alloc(issue.Issue, issues.items.len);
-            @memcpy(self.search_result, issues.items);
+            for (issues.items, 0..) |is, idx| {
+                self.search_result[idx] = try issue.Issue.deepCopy(allocator, is);
+            }
         }else {
             self.search_result = try fuzzy.filterAndSort(allocator, query, issues.items, 30);
         }
@@ -254,3 +279,11 @@ fn draw_line(writer: *std.Io.Writer, line: []const u8, cursor_pos: usize, search
     try writer.print("\x1b[{};{}H", .{search_details.y, search_details.x+cursor_pos});
     try writer.flush();
 }
+
+fn toCstr(allocator: Allocator, str: []const u8) ![]const u8 {
+    var cstr: []u8 = try allocator.alloc(u8, str.len + 1);
+    @memcpy(cstr[0..str.len], str);
+    cstr[str.len]  = 0;
+    return cstr;
+}
+

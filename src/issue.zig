@@ -13,6 +13,7 @@ pub const Issue = struct {
     issue_type: IssueType,
     status: IssueStatus,
     description: ?[]u8,
+    file_path: ?[]u8,
 
     pub fn print(self: Issue) !void {
         var stdout_buf: [1024]u8 = undefined;
@@ -28,10 +29,38 @@ pub const Issue = struct {
 
     }
 
+    pub fn deepCopy(allocator: Allocator, is: Issue) !Issue{
+        const owned_title = try allocator.alloc(u8, is.title.len);
+        @memcpy(owned_title, is.title);
+
+        var owned_description: ?[]u8 = null;
+        if (is.description) |d| {
+            owned_description = try allocator.alloc(u8, d.len);
+            @memcpy(owned_description.?, d);
+        }
+        var owned_file_path: ?[]u8 = null;
+        if (is.file_path) |f| {
+            owned_file_path = try allocator.alloc(u8, f.len);
+            @memcpy(owned_file_path.?, f);
+        }
+
+        return Issue{
+            .title = owned_title,
+            .issue_type = is.issue_type,
+            .status = is.status,
+            .description = owned_description,
+            .file_path = owned_file_path,
+        };
+
+    }
+
     pub fn deinit(self: Issue, allocator: Allocator) void {
         allocator.free(self.title);
         if (self.description) |d| {
             allocator.free(d);
+        }
+        if (self.file_path) |f| {
+            allocator.free(f);
         }
     }
 };
@@ -132,7 +161,11 @@ pub const Clerk = struct {
                 defer allocator.free(file_path);
                 const file = try self.wd.openFile(file_path, .{.mode = .read_only});
                 defer file.close();
-                const new_issue = try readIssue(allocator, file);
+                var new_issue = try readIssue(allocator, file);
+
+
+                const path = try self.wd.realpathAlloc(allocator, file_path);
+                new_issue.file_path = path;
                 try issue_list.append(allocator, new_issue);
             }else {
                 break;
@@ -155,6 +188,7 @@ pub const Clerk = struct {
             .description = arg.description orelse "",
             .issue_type = arg.issue_type orelse IssueType.feature,
             .status = IssueStatus.open,
+            .file_path = null,
         };
 
         var issue_file = try issue_dir.createFile(ISSUE_FILE_NAME, .{});
@@ -296,6 +330,7 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
         .issue_type = .feature,
         .status = .open,
         .description = null,
+        .file_path = null,
     };
 
     _ = try reader.interface.streamDelimiter(&allocating.writer, '\n');
