@@ -2,8 +2,7 @@ const std = @import("std");
 const os = std.os;
 const posix = std.posix;
 
-
-fn getTerminalSize() !posix.winsize {
+pub fn getTerminalSize() !posix.winsize {
     var ws: posix.winsize = undefined;
     if (os.linux.ioctl(std.posix.STDOUT_FILENO, os.linux.T.IOCGWINSZ, @intFromPtr(&ws)) != 0) {
         return error.IoctlFailed;
@@ -23,7 +22,7 @@ fn getBoxSize(terminal_size: posix.winsize) BoxDimensions {
     };
 }
 
-const Box = struct {
+pub const Box = struct {
     x: u16,
     y: u16,
     width: u16,
@@ -31,7 +30,7 @@ const Box = struct {
     identifier: ?[]const u8,
 };
 
-fn DrawBox(box: Box) void {
+pub fn DrawBox(box: Box) void {
 
     std.debug.print("\x1b(0", .{});
     std.debug.print("\x1b[{};{}Hl", .{box.y, box.x});
@@ -55,7 +54,7 @@ fn DrawBox(box: Box) void {
     std.debug.print("\x1b(B", .{});
 }
 
-fn calculateResultBox(terminal_size: posix.winsize) Box {
+pub fn CalculateResult(terminal_size: posix.winsize) Box {
     return Box{
         .identifier = "Result",
         .x = @divFloor(terminal_size.col, 8),
@@ -65,19 +64,7 @@ fn calculateResultBox(terminal_size: posix.winsize) Box {
     };
 }
 
-fn CalculateSearch(terminal_size: posix.winsize) Box {
-
-    return Box {
-        .identifier = "Search",
-        .x = @divFloor(terminal_size.col, 8),
-        .y = 3 * @divFloor(terminal_size.row, 4)+2,
-        .width = @divFloor(terminal_size.col, 2),
-        .height = 2,
-    };
-
-}
-fn CalculatePreview(terminal_size: posix.winsize) Box {
-
+pub fn CalculatePreview(terminal_size: posix.winsize) Box {
     return Box{
         .identifier = "Preview",
         .x = @divFloor(terminal_size.col, 8) + 2 + @divFloor(terminal_size.col, 2),
@@ -87,18 +74,8 @@ fn CalculatePreview(terminal_size: posix.winsize) Box {
     };
 }
 
-pub fn render() !void {
-    const term_size = try getTerminalSize();
-    const result_box = calculateResultBox(term_size);
-    const preview_box = CalculatePreview(term_size);
-    const search_box = CalculateSearch(term_size);
-    DrawBox(result_box);
-    DrawBox(preview_box);
-    DrawBox(search_box);
-    std.debug.print("\n", .{});
-}
-
-test "drawLine" {
-    try render();
-}
-
+pub const SearchDetails = struct {
+    x: u16,
+    y: u16,
+    width: u16
+};
