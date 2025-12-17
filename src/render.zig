@@ -30,28 +30,28 @@ pub const Box = struct {
     identifier: ?[]const u8,
 };
 
-pub fn DrawBox(box: Box) void {
+pub fn DrawBox(stdout: *std.Io.Writer, box: Box) !void {
 
-    std.debug.print("\x1b(0", .{});
-    std.debug.print("\x1b[{};{}Hl", .{box.y, box.x});
-    for (0..box.width) |_| std.debug.print("q", .{});
-    std.debug.print("k", .{});
+    try stdout.print("\x1b(0", .{});
+    try stdout.print("\x1b[{};{}Hl", .{box.y, box.x});
+    for (0..box.width) |_| try stdout.print("q", .{});
+    try stdout.print("k", .{});
 
     if (box.identifier) |id| { 
-        std.debug.print("\x1b(B", .{});
-        std.debug.print("\x1b[{};{}H {s} ", .{box.y, box.x - 1 + @divFloor(box.width, 2) - @divFloor(id.len,2), id});
-        std.debug.print("\x1b(0", .{});
+        try stdout.print("\x1b(B", .{});
+        try stdout.print("\x1b[{};{}H {s} ", .{box.y, box.x - 1 + @divFloor(box.width, 2) - @divFloor(id.len,2), id});
+        try stdout.print("\x1b(0", .{});
     }
 
     for (box.y+1..box.y + box.height) |i| {
-        std.debug.print("\x1b[{};{}Hx", .{ i , box.x});
-        std.debug.print("\x1b[{};{}Hx", .{ i, box.x + box.width + 1 });
+        try stdout.print("\x1b[{};{}Hx", .{ i , box.x});
+        try stdout.print("\x1b[{};{}Hx", .{ i, box.x + box.width + 1 });
     }
 
-    std.debug.print("\x1b[{};{}Hm", .{box.y + box.height, box.x});
-    for (0..box.width) |_| std.debug.print("q", .{});
-    std.debug.print("j", .{});
-    std.debug.print("\x1b(B", .{});
+    try stdout.print("\x1b[{};{}Hm", .{box.y + box.height, box.x});
+    for (0..box.width) |_| try stdout.print("q", .{});
+    try stdout.print("j", .{});
+    try stdout.print("\x1b(B", .{});
 }
 
 pub fn CalculateResult(terminal_size: posix.winsize) Box {
