@@ -1,6 +1,8 @@
 const std = @import("std");
 const terminal = @import("terminal.zig");
 const render = @import("render.zig");
+const issue = @import("issue.zig");
+const fuzzy = @import("search.zig");
 const Allocator = std.mem.Allocator;
 
 const ESC = '\x1b';
@@ -45,10 +47,16 @@ pub fn run(allocator: Allocator) !void {
     render.DrawBox(preview);
     render.DrawBox(search);
 
+    var clerk = try issue.Clerk.init();
+    defer clerk.deinit();
+
+    const issues = try clerk.getIssueList(allocator);
+    defer allocator.free(issues);
+
     var user_input = try std.ArrayList(u8).initCapacity(allocator, 30);
     defer user_input.deinit(allocator);
     term.set_raw();
-    try read_search(allocator, &stdout.interface, &user_input, search_pos);
+    try read_search(allocator, &stdout.interface, &user_input, search_pos, result, issues);
     term.set_cooked();
 }
 
@@ -58,11 +66,50 @@ pub fn FillSearch(allocator: std.mem.Allocator, stdout: *std.Io.Writer, result_b
     _ = result_box;
 }
 
+pub fn populate_search(
+    allocator: Allocator,
+    stdout: *std.Io.Writer,
+    result_box: render.Box,
+    issues: []issue.Issue,
+    query: []u8,
+) void {
+    var cur_row = result_box.y + result_box.height - 1;
+    const col = result_box.x + 2;
+
+    var clear = result_box.y + 1;
+    while (clear < result_box.y + result_box.height) : (clear += 1) {
+        stdout.print("\x1b[{};{}H", .{clear, col}) catch {};
+        for (0..result_box.width-1) |_| stdout.print(" ", .{}) catch {};
+    }
+    if (query.len == 0) {
+        for (issues) |is| {
+            stdout.print("\x1b[{};{}H{s}", .{cur_row, col, is.title}) catch {};
+            if (cur_row <= result_box.y) {
+                break;
+            }
+            cur_row -= 1;
+        }
+    }else {
+        const se = fuzzy.filterAndSort(allocator, query, issues, 30) catch { return;};
+        for (se) |is| {
+            stdout.print("\x1b[{};{}H{s}", .{cur_row, col, is.title}) catch {};
+            if (cur_row <= result_box.y) {
+                break;
+            }
+            cur_row -= 1;
+        }
+    }
+
+    stdout.flush() catch {};
+}
+
 pub fn read_search(
     allocator: std.mem.Allocator,
     stdout: *std.Io.Writer,
     array_list: *std.ArrayList(u8),
     search_details: render.SearchDetails,
+    result_box: render.Box,
+    issues: []issue.Issue,
     ) !void {
 
     // Initialize the reader for reading stdin
@@ -72,24 +119,23 @@ pub fn read_search(
     // Initialize the cursor position
     var cursor_position: usize = 0;
 
+    populate_search(allocator, stdout, result_box, issues, array_list.items);
     try stdout.print("\x1b[{};{}H", .{search_details.y, search_details.x});
     try stdout.flush();
 
     while (true) {
+
         // Read the character
         const c = try stdin.interface.takeByte();
 
         if (c == BACKSPACE) {
-            if (array_list.items.len == 0) {
-                continue;
-            }
-
-            if (cursor_position == 0) {
+            if (array_list.items.len == 0 or cursor_position == 0) {
                 continue;
             }
 
             cursor_position -= 1;
             _ = array_list.orderedRemove(cursor_position);
+            populate_search(allocator, stdout, result_box, issues, array_list.items);
             try draw_line(stdout, array_list.items, cursor_position, search_details);
         }
 
@@ -139,6 +185,7 @@ pub fn read_search(
         else {
             try array_list.insert(allocator, cursor_position, c);
             cursor_position +=1;
+            populate_search(allocator, stdout, result_box, issues, array_list.items);
             try draw_line(stdout, array_list.items, cursor_position, search_details);
         }
     }
