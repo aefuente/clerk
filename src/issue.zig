@@ -163,10 +163,15 @@ pub const Clerk = struct {
                 defer file.close();
                 var new_issue = try readIssue(allocator, file);
 
+                if (new_issue.status == .open) {
+                    const path = try self.wd.realpathAlloc(allocator, file_path);
+                    new_issue.file_path = path;
+                    try issue_list.append(allocator, new_issue);
+                }else {
+                    new_issue.deinit(allocator);
+                }
 
-                const path = try self.wd.realpathAlloc(allocator, file_path);
-                new_issue.file_path = path;
-                try issue_list.append(allocator, new_issue);
+
             }else {
                 break;
             }

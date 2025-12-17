@@ -13,6 +13,7 @@ const RIGHT_ARROW = '\x43';
 const LEFT_ARROW = '\x44';
 const BACKSPACE = '\x7F';
 const CTRL_C = '\x03';
+const DELETE = '\x7e';
 
 const STDIN_BUF_SIZE: usize = 1024;
 
@@ -125,7 +126,7 @@ pub const screen = struct {
         var read_buf: [STDIN_BUF_SIZE]u8 = undefined;
         var stdin = std.fs.File.stdin().reader(&read_buf);
 
-        const issues = try self.clerk.getIssues(allocator);
+        var issues = try self.clerk.getIssues(allocator);
         defer issues.deinit(allocator);
 
         try self.populateSearch(allocator, array_list.items, issues);
@@ -172,6 +173,26 @@ pub const screen = struct {
                 if (code == BRACKET) {
                     const next_code = try stdin.interface.takeByte();
                     switch (next_code) {
+                        '\x33' => {
+                            const lastcode = try stdin.interface.takeByte();
+                            if (lastcode == DELETE) {
+                                if (self.selection_pos < self.search_result.len) {
+                                    if (self.search_result[self.selection_pos].file_path) |file_path| {
+                                        const f = try std.fs.openFileAbsolute(file_path, .{.mode =.read_write});
+                                        try issue.closeIssue(allocator, f);
+                                        issues.deinit(allocator);
+                                        issues = try self.clerk.getIssues(allocator);
+                                        if (self.selection_pos == self.search_result.len-1 and self.selection_pos > 0) {
+                                            self.selection_pos -= 1;
+                                        }
+                                        try self.populateSearch(allocator, array_list.items, issues);
+                                    }
+                                }
+                            }
+
+                            try self.setCursorPositionSearch();
+                            continue;
+                        },
                         LEFT_ARROW => {
                             if (self.cursor_pos == 0) {
                                 continue;
@@ -225,6 +246,9 @@ pub const screen = struct {
     }
 
     pub fn search(self: *screen, allocator: Allocator, query: []const u8, issues: issue.Issues) !void{
+        for (self.search_result) |is| {
+            is.deinit(allocator);
+        }
         allocator.free(self.search_result);
         if (query.len == 0) {
             self.search_result = try allocator.alloc(issue.Issue, issues.items.len);
@@ -261,6 +285,9 @@ pub const screen = struct {
     pub fn deinit(self: *screen, allocator: Allocator) void {
         self.clerk.deinit();
         self.terminal.close();
+        for (self.search_result) |is| {
+            is.deinit(allocator);
+        }
         allocator.free(self.search_result);
     }
 

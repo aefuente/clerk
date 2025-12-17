@@ -35,7 +35,7 @@ fn normalize(allocator: Allocator, text: []const u8) ![]u8{
             i += 1;
         }
     }
-    return title[0..i];
+    return title;
 }
 
 fn scoreTitle(
