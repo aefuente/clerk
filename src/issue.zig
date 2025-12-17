@@ -5,6 +5,7 @@ pub const args = @import("argparser.zig");
 const c = @cImport(@cInclude("time.h"));
 
 const ISSUE_FILE_NAME = "issue.ini";
+const CLERK_DIRECTORY_NAME = ".clerk";
 const TIME_STR_LENGTH = 16;
 
 pub const Issue = struct {
@@ -211,11 +212,11 @@ fn getGitDirectory() !Dir {
 pub fn makeClerkDirectory() !Dir {
     var git = getGitDirectory() catch |err | switch (err) {
         error.NoGitDirectory => {
-            std.fs.cwd().makeDir("clerk") catch |e | switch (e) {
+            std.fs.cwd().makeDir(CLERK_DIRECTORY_NAME) catch |e | switch (e) {
             error.PathAlreadyExists => { },
             else => {return e;}
         };
-            return try std.fs.cwd().openDir("clerk", .{.iterate = true});
+            return try std.fs.cwd().openDir(CLERK_DIRECTORY_NAME, .{.iterate = true});
         },
         else => {
             return err;
@@ -223,11 +224,11 @@ pub fn makeClerkDirectory() !Dir {
     };
     defer git.close();
 
-    git.makeDir("clerk") catch |err | switch (err) {
+    git.makeDir(CLERK_DIRECTORY_NAME) catch |err | switch (err) {
         error.PathAlreadyExists => { },
         else => {return err;}
     };
-    return try git.openDir("clerk", .{ .iterate = true });
+    return try git.openDir(CLERK_DIRECTORY_NAME, .{ .iterate = true });
 }
 pub fn closeIssue(allocator: Allocator, file: std.fs.File) !void {
     var read_buf: [1024]u8 = undefined;
