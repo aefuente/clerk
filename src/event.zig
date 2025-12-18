@@ -185,7 +185,7 @@ pub const screen = struct {
                                         if (self.selection_pos == self.search_result.len-1 and self.selection_pos > 0) {
                                             self.selection_pos -= 1;
                                         }
-                                        try self.populateSearch(allocator, array_list.items, issues);
+                                        try self.updateScreen(allocator, array_list, issues);
                                     }
                                 }
                             }
