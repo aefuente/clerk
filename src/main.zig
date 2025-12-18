@@ -44,16 +44,13 @@ pub fn main() !void {
 
         },
         .list => {
-            const issues = try tracker.getIssueList(gpa);
-            for (issues) | issue| {
+            const issues = try tracker.getIssues(gpa);
+            defer issues.deinit(gpa);
+            for (issues.items) | issue| {
                 if (issue.status == .open) {
                     try issue.print();
                 }
             }
-            for (issues) | l| {
-                l.deinit(gpa);
-            }
-            gpa.free(issues);
         },
     } else {
         try clerk.event.run(gpa);

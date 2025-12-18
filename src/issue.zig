@@ -13,6 +13,7 @@ pub const Issue = struct {
     issue_type: IssueType,
     status: IssueStatus,
     description: ?[]u8,
+    file_path: ?[]u8,
 
     pub fn print(self: Issue) !void {
         var stdout_buf: [1024]u8 = undefined;
@@ -28,10 +29,38 @@ pub const Issue = struct {
 
     }
 
+    pub fn deepCopy(allocator: Allocator, is: Issue) !Issue{
+        const owned_title = try allocator.alloc(u8, is.title.len);
+        @memcpy(owned_title, is.title);
+
+        var owned_description: ?[]u8 = null;
+        if (is.description) |d| {
+            owned_description = try allocator.alloc(u8, d.len);
+            @memcpy(owned_description.?, d);
+        }
+        var owned_file_path: ?[]u8 = null;
+        if (is.file_path) |f| {
+            owned_file_path = try allocator.alloc(u8, f.len);
+            @memcpy(owned_file_path.?, f);
+        }
+
+        return Issue{
+            .title = owned_title,
+            .issue_type = is.issue_type,
+            .status = is.status,
+            .description = owned_description,
+            .file_path = owned_file_path,
+        };
+
+    }
+
     pub fn deinit(self: Issue, allocator: Allocator) void {
         allocator.free(self.title);
         if (self.description) |d| {
             allocator.free(d);
+        }
+        if (self.file_path) |f| {
+            allocator.free(f);
         }
     }
 };
@@ -123,7 +152,7 @@ pub const Clerk = struct {
 
     }
 
-    pub fn getIssueList(self: *Clerk, allocator: Allocator) ![]Issue {
+    pub fn getIssues(self: *Clerk, allocator: Allocator) !Issues {
         var issue_list = try std.ArrayList(Issue).initCapacity(allocator, 10);
         var dir_iterator = self.wd.iterate();
         while (try dir_iterator.next()) |entry | {
@@ -131,13 +160,25 @@ pub const Clerk = struct {
                 const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, ISSUE_FILE_NAME});
                 defer allocator.free(file_path);
                 const file = try self.wd.openFile(file_path, .{.mode = .read_only});
-                const new_issue = try readIssue(allocator, file);
-                try issue_list.append(allocator, new_issue);
+                defer file.close();
+                var new_issue = try readIssue(allocator, file);
+
+                if (new_issue.status == .open) {
+                    const path = try self.wd.realpathAlloc(allocator, file_path);
+                    new_issue.file_path = path;
+                    try issue_list.append(allocator, new_issue);
+                }else {
+                    new_issue.deinit(allocator);
+                }
+
+
             }else {
                 break;
             }
         }
-        return issue_list.toOwnedSlice(allocator);
+        return Issues{
+            .items = try issue_list.toOwnedSlice(allocator),
+        };
     }
 
     pub fn openIssue(self: *Clerk, arg: args.Args) ![]const u8 {
@@ -152,12 +193,24 @@ pub const Clerk = struct {
             .description = arg.description orelse "",
             .issue_type = arg.issue_type orelse IssueType.feature,
             .status = IssueStatus.open,
+            .file_path = null,
         };
 
         var issue_file = try issue_dir.createFile(ISSUE_FILE_NAME, .{});
         defer issue_file.close();
         try writeIssue(issue_file, new_issue);
         return id;
+    }
+};
+
+pub const Issues = struct {
+    items: []Issue,
+
+    pub fn deinit(self: Issues, allocator: Allocator) void {
+        for (self.items) |i| {
+            i.deinit(allocator);
+        }
+        allocator.free(self.items);
     }
 };
 
@@ -282,6 +335,7 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
         .issue_type = .feature,
         .status = .open,
         .description = null,
+        .file_path = null,
     };
 
     _ = try reader.interface.streamDelimiter(&allocating.writer, '\n');
@@ -367,8 +421,6 @@ pub fn stringToIssueStatus(value: []const u8) !IssueStatus{
     if (std.mem.eql(u8, value, "closed")) {return .closed; }
     return error.NoMatch;
 }
-
-
 
 fn isClerkId(value: []const u8) bool {
     if (value.len != 15) return false;
