@@ -129,7 +129,7 @@ pub const screen = struct {
         var issues = try self.clerk.getIssues(allocator);
         defer issues.deinit(allocator);
 
-        try self.populateSearch(allocator, array_list.items, issues);
+        try self.updateScreen(allocator, array_list, issues);
 
         try self.stdout.print("\x1b[{};{}H", .{self.search_bounds.y, self.search_bounds.x});
         try self.stdout.flush();
@@ -150,8 +150,8 @@ pub const screen = struct {
                 self.selection_pos = 0;
                 self.cursor_pos -= 1;
                 _ = array_list.orderedRemove(self.cursor_pos);
-                try self.populateSearch(allocator, array_list.items, issues);
-                try draw_line(self.stdout, array_list.items, self.cursor_pos, self.search_bounds);
+
+                try self.updateScreen(allocator, array_list, issues);
             }
 
 
@@ -198,7 +198,7 @@ pub const screen = struct {
                                 continue;
                             }
                             self.cursor_pos -= 1;
-                            try draw_line( self.stdout, array_list.items, self.cursor_pos, self.search_bounds);
+                            try self.DrawLine(array_list.items);
                             continue;
                         },
                         RIGHT_ARROW => {
@@ -206,20 +206,18 @@ pub const screen = struct {
                                 continue;
                             }
                             self.cursor_pos += 1;
-                            try draw_line(self.stdout, array_list.items, self.cursor_pos, self.search_bounds);
+                            try self.DrawLine(array_list.items);
                             continue;
                         },
                         UP_ARROW => {
                             if (self.selection_pos+1 >= self.search_result.len) { continue; }
                             self.selection_pos += 1;
-                            try self.populateSearch(allocator, array_list.items, issues);
-                            try draw_line(self.stdout, array_list.items, self.cursor_pos, self.search_bounds);
+                            try self.updateScreen(allocator, array_list, issues);
                         },
                         DOWN_ARROW => {
                             if (self.selection_pos > 0) {
                                 self.selection_pos -= 1;
-                                try self.populateSearch(allocator, array_list.items, issues);
-                                try draw_line(self.stdout, array_list.items, self.cursor_pos, self.search_bounds);
+                                try self.updateScreen(allocator, array_list, issues);
                             }
                         },
                         else => { }
@@ -230,14 +228,41 @@ pub const screen = struct {
                 try array_list.insert(allocator, self.cursor_pos, c);
                 self.cursor_pos +=1;
                 self.selection_pos = 0;
-                try self.populateSearch(allocator, array_list.items, issues);
-                try draw_line(self.stdout, array_list.items, self.cursor_pos, self.search_bounds);
+                try self.updateScreen(allocator, array_list, issues);
             }
         }
         if (self.selection_pos < self.search_result.len) {
             return self.search_result[self.selection_pos];
         }
         return null;
+    }
+
+    pub fn DrawLine(self: screen, line: []const u8) !void {
+
+        var printable: []const u8 = line;
+        if (line.len >= self.search_bounds.width) {
+            const start = line.len - self.search_bounds.width;
+            printable = line[start..];
+        }
+
+        try self.stdout.print("\x1b[{};{}H", .{self.search_bounds.y, self.search_bounds.x});
+        try self.stdout.print("{s}",.{printable});
+        if (line.len <= self.search_bounds.width) {
+            try cleanSearch(self.stdout, self.search_bounds.width - line.len);
+        }
+        if (self.cursor_pos >= self.search_bounds.width) {
+            try self.stdout.print("\x1b[{};{}H", .{self.search_bounds.y, self.search_bounds.x+self.search_bounds.width});
+        }else {
+            try self.stdout.print("\x1b[{};{}H", .{self.search_bounds.y, self.search_bounds.x+self.cursor_pos});
+        }
+        try self.stdout.flush();
+    }
+
+    pub fn updateScreen(self: *screen, allocator: Allocator, array_list: std.ArrayList(u8), issues: issue.Issues) !void {
+        try self.populateSearch(allocator, array_list.items, issues);
+        try self.printPreview();
+        try self.DrawLine(array_list.items);
+        try self.stdout.flush();
     }
 
     pub fn populateSearch(self: *screen, allocator: Allocator, query: []const u8, issues: issue.Issues) !void {
@@ -282,6 +307,65 @@ pub const screen = struct {
 
     }
 
+    pub fn printPreview(self: screen) !void {
+        const col_start = self.preview_box.x + 2;
+        const max_width = self.preview_box.width - 2 ;
+        const row_start = self.preview_box.y + 1;
+        const max_height = self.preview_box.height - 2;
+
+
+        for (0..max_height) |i| {
+            try self.stdout.print("\x1b[{};{}H", .{row_start+i, col_start});
+            try cleanSearch(self.stdout, max_width);
+        }
+
+        if (self.selection_pos >= self.search_result.len) {
+            return;
+        }
+        const is =self.search_result[self.selection_pos];
+
+        if (is.title.len >= max_width) {
+            try self.stdout.print("\x1b[{};{}H{s}", .{row_start, col_start, is.title[0..max_width]});
+        }else {
+            try self.stdout.print("\x1b[{};{}H{s}", .{row_start, col_start, is.title});
+            try cleanSearch(self.stdout, max_width - is.title.len);
+        }
+        try self.stdout.print("\x1b[{};{}H", .{row_start+1, col_start});
+        try cleanSearch(self.stdout, max_width-1);
+        try self.stdout.print("\x1b[{};{}H{any}", .{row_start+1, col_start, is.issue_type});
+
+        try self.stdout.print("\x1b[{};{}H", .{row_start+2, col_start});
+        try cleanSearch(self.stdout, max_width-1);
+        try self.stdout.print("\x1b[{};{}H{any}", .{row_start+2, col_start, is.status});
+
+        if (is.description) |d| {
+
+            var idx: usize = 0;
+            var cur_row: usize = 4;
+            var cur_col: usize = col_start;
+
+            try self.stdout.print("\x1b[{};{}H", .{row_start+cur_row, col_start});
+            while (idx < d.len) {
+                if (cur_col >= col_start + max_width) { 
+                    cur_col = col_start;
+                    cur_row += 1;
+                    try self.stdout.print("\x1b[{};{}H", .{row_start+cur_row, cur_col});
+                }
+                if (cur_row >= max_height + row_start) {break;}
+                if (d[idx] == '\n') {
+                    cur_col = col_start;
+                    cur_row += 1;
+                    try self.stdout.print("\x1b[{};{}H", .{row_start+cur_row, cur_col});
+                }else {
+                    try self.stdout.print("{c}", .{d[idx]});
+                }
+                idx += 1;
+                cur_col +=1;
+            }
+        }
+        try self.stdout.flush();
+    }
+
     pub fn deinit(self: *screen, allocator: Allocator) void {
         self.clerk.deinit();
         self.terminal.close();
@@ -290,21 +374,10 @@ pub const screen = struct {
         }
         allocator.free(self.search_result);
     }
-
 };
 
 fn cleanSearch(writer: *std.Io.Writer, n: usize) !void {
     for (0..n) |_| try writer.print(" ", .{});
-}
-
-fn draw_line(writer: *std.Io.Writer, line: []const u8, cursor_pos: usize, search_details: render.SearchDetails) !void {
-    try writer.print("\x1b[{};{}H", .{search_details.y, search_details.x});
-    try writer.print("{s}",.{line});
-    if (line.len <= search_details.width) {
-        try cleanSearch(writer, search_details.width - line.len);
-    }
-    try writer.print("\x1b[{};{}H", .{search_details.y, search_details.x+cursor_pos});
-    try writer.flush();
 }
 
 fn toCstr(allocator: Allocator, str: []const u8) ![]const u8 {

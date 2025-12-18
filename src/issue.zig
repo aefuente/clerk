@@ -422,8 +422,6 @@ pub fn stringToIssueStatus(value: []const u8) !IssueStatus{
     return error.NoMatch;
 }
 
-
-
 fn isClerkId(value: []const u8) bool {
     if (value.len != 15) return false;
 
