@@ -90,7 +90,10 @@ pub const Clerk = struct {
                 const file = try self.wd.openFile(file_path, .{.mode = .read_write});
                 defer file.close();
 
-                var new_issue = try readIssue(allocator, file);
+                var new_issue = readIssue(allocator, file) catch |err| switch(err) {
+                    error.Parsing => {continue;},
+                    else => { return err; }
+                };
                 defer new_issue.deinit(allocator);
                 new_issue.status = .closed;
 
@@ -102,7 +105,10 @@ pub const Clerk = struct {
                 const file = try self.wd.openFile(file_path, .{.mode = .read_write});
                 defer file.close();
 
-                var new_issue = try readIssue(allocator, file);
+                var new_issue = readIssue(allocator, file) catch |err| switch(err) {
+                    error.Parsing => {continue;},
+                    else => { return err; }
+                };
                 defer new_issue.deinit(allocator);
 
                 if (new_issue.status == .closed) {
@@ -139,7 +145,10 @@ pub const Clerk = struct {
                 const file = try self.wd.openFile(file_path, .{.mode = .read_write});
                 defer file.close();
 
-                var new_issue = try readIssue(allocator, file);
+                var new_issue = readIssue(allocator, file) catch |err| switch(err) {
+                    error.Parsing => {continue;},
+                    else => { return err; }
+                };
                 defer new_issue.deinit(allocator);
 
                 if (std.mem.eql(u8, new_issue.title, identifier)){
@@ -161,7 +170,10 @@ pub const Clerk = struct {
                 defer allocator.free(file_path);
                 const file = try self.wd.openFile(file_path, .{.mode = .read_only});
                 defer file.close();
-                var new_issue = try readIssue(allocator, file);
+                var new_issue = readIssue(allocator, file) catch |err| switch(err) {
+                    error.Parsing => {continue;},
+                    else => { return err; }
+                };
 
                 if (new_issue.status == .open) {
                     const path = try self.wd.realpathAlloc(allocator, file_path);
@@ -329,6 +341,7 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
     var reader = file.reader(&read_buf);
 
     var allocating = std.Io.Writer.Allocating.init(allocator);
+    errdefer allocating.deinit();
 
     var result = Issue{
         .title = "",
@@ -337,6 +350,7 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
         .description = null,
         .file_path = null,
     };
+    errdefer result.deinit(allocator);
 
     _ = try reader.interface.streamDelimiter(&allocating.writer, '\n');
     const first_line = allocating.written();
@@ -407,19 +421,19 @@ pub fn writeIssue(file: std.fs.File, issue: Issue) !void {
     try writer.interface.flush();
 }
 
-pub fn stringToIssueType(value: []const u8) !IssueType{
+pub fn stringToIssueType(value: []const u8) error{Parsing}!IssueType{
     if (std.mem.eql(u8, value, "fix")) {return .fix; }
     if (std.mem.eql(u8, value, "bug")) {return .bug; }
     if (std.mem.eql(u8, value, "chore")) {return .chore; }
     if (std.mem.eql(u8, value, "feature")) {return .feature; }
-    return error.NoMatch;
+    return error.Parsing;
 }
 
 
-pub fn stringToIssueStatus(value: []const u8) !IssueStatus{
+pub fn stringToIssueStatus(value: []const u8) error{Parsing}!IssueStatus{
     if (std.mem.eql(u8, value, "open")) {return .open; }
     if (std.mem.eql(u8, value, "closed")) {return .closed; }
-    return error.NoMatch;
+    return error.Parsing;
 }
 
 fn isClerkId(value: []const u8) bool {

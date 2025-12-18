@@ -15,7 +15,6 @@ pub fn main() !void {
             return err;
         }
     };
-    std.debug.print("args: {any}\n", .{args});
     defer args.deinit(gpa);
 
     var tracker = try clerk.Clerk.init();
