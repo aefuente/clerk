@@ -10,6 +10,7 @@ pub const Args = struct {
     target: ?[]u8,
     description: ?[]u8,
     issue_type: ?IssueType,
+    today: bool = false,
 
     pub fn init(allocator: Allocator) !Args {
         const command_args = try std.process.argsAlloc(allocator);
@@ -21,6 +22,7 @@ pub const Args = struct {
             .target = null,
             .description = null,
             .issue_type = null,
+            .today = false,
         };
 
         try args.parse();
@@ -59,25 +61,54 @@ pub const Args = struct {
         if (self.arg_buf.len <= 1) {
             return;
         }
+        var arg_pos: usize = 1;
 
-        self.action = try getAction(self.arg_buf[1]);
+        if (getAction(self.arg_buf[arg_pos])) |act| {
+            self.action = act;
+            arg_pos += 1;
+        }
 
-        if (self.action == action.list) {
+        if ( arg_pos < self.arg_buf.len and ! isVariable(self.arg_buf[arg_pos])) {
+            self.target = self.arg_buf[arg_pos];
+            arg_pos += 1;
+        }
+
+        while (arg_pos < self.arg_buf.len) {
+            const arg = self.arg_buf[arg_pos];
+            self.setFlag(arg) catch {
+                if (isVariable(arg)) {
+                    if (arg_pos + 1 >= self.arg_buf.len) {
+                        return error.ExpectedValue;
+                    }
+                    try self.setVariable(arg, self.arg_buf[arg_pos+1]);
+                    arg_pos += 1;
+                }else {
+                    return error.NoMatchingOption;
+                }
+            };
+            arg_pos += 1;
+        }
+    }
+
+
+    fn setVariable(self: *Args, name: [:0]u8, value: [:0]u8) !void {
+        if (std.mem.eql(u8, "--description", name) or
+            std.mem.eql(u8, "-d", name)) {
+            self.description = value[0..value.len];
+        }
+        else if (std.mem.eql(u8, "--type", name) or
+            std.mem.eql(u8, "-t", name)) {
+            self.issue_type = try getIssueType(value);
+        }
+    }
+
+    fn setFlag(self: *Args, name: [:0]u8) error{NotFlag}!void {
+        if (std.mem.eql(u8, "--today", name) or
+            std.mem.eql(u8, "-y", name)) { 
+            self.today = true;
             return;
         }
-        self.target = self.arg_buf[2][0..self.arg_buf[2].len];
-        
-        var idx: usize = 3;
-
-        while (idx+1 < self.arg_buf.len) : (idx += 2) {
-            if (!isVariable(self.arg_buf[idx])){
-                return error.ExpectedVar;
-            }
-            if (isVariable(self.arg_buf[idx+1])) {
-                return error.ExpectedValue;
-            }
-            try setVariable(self, self.arg_buf[idx], self.arg_buf[idx+1]);
-        }
+        return error.NotFlag;
     }
 
     pub fn deinit(self: *Args, allocator: Allocator) void {
@@ -86,25 +117,19 @@ pub const Args = struct {
 
 };
 
-fn setVariable(arg: *Args, name: [:0]u8, value: [:0]u8) !void {
-    if (std.mem.eql(u8, "--description", name) or
-        std.mem.eql(u8, "-d", name)) {
-        arg.description = value[0..value.len];
-    }
-    else if (std.mem.eql(u8, "--type", name) or
-        std.mem.eql(u8, "-t", name)) {
-        arg.issue_type = try getIssueType(value);
-    }
+fn isFlag() !bool {
+
 }
 
-fn getAction(value: [:0]u8) !action {
+fn getAction(value: [:0]u8) ?action {
     if (std.mem.eql(u8, value, "open")) { return action.open; }
     else if (std.mem.eql(u8, value, "edit")) { return action.edit; }
     else if (std.mem.eql(u8, value, "ls")) { return action.list; }
     else if (std.mem.eql(u8, value, "close")) { return action.close; }
     else if (std.mem.eql(u8, value, "delete")) { return action.delete; }
-    return error.BadArgs;
+    return null;
 }
+
 
 fn getIssueType(value: [:0]u8) !IssueType {
     if (std.mem.eql(u8, value, "fix")) { return IssueType.fix; }
