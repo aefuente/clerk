@@ -11,6 +11,7 @@ pub const Args = struct {
     description: ?[]u8,
     issue_type: ?IssueType,
     today: bool = false,
+    closed: bool = false,
 
     pub fn init(allocator: Allocator) !Args {
         const command_args = try std.process.argsAlloc(allocator);
@@ -23,6 +24,7 @@ pub const Args = struct {
             .description = null,
             .issue_type = null,
             .today = false,
+            .closed = false,
         };
 
         try args.parse();
@@ -50,6 +52,9 @@ pub const Args = struct {
             try stdout.interface.print("\t-h, --help\t\tDisplay this help message\n", .{});
             try stdout.interface.print("\t-d, --description\tInfo about the issue\n", .{});
             try stdout.interface.print("\t-t, --type\t\tDefines the type of issue\n", .{});
+            try stdout.interface.print("\nFlags:\n", .{});
+            try stdout.interface.print("\t-y, --today\t\tOnly list issues from current day\n", .{});
+            try stdout.interface.print("\t-c, --closed\t\tOnly list closed issues\n", .{});
             try stdout.interface.print("\nExamples:\n", .{});
             try stdout.interface.print("\tck open \"new feature\" -d \"makes it better\" -t feature\n", .{});
 
@@ -108,6 +113,11 @@ pub const Args = struct {
             self.today = true;
             return;
         }
+        if (std.mem.eql(u8, "--closed", name) or
+            std.mem.eql(u8, "-c", name)) { 
+            self.closed = true;
+            return;
+        }
         return error.NotFlag;
     }
 
@@ -116,10 +126,6 @@ pub const Args = struct {
     }
 
 };
-
-fn isFlag() !bool {
-
-}
 
 fn getAction(value: [:0]u8) ?action {
     if (std.mem.eql(u8, value, "open")) { return action.open; }
