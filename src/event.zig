@@ -297,15 +297,21 @@ pub const screen = struct {
             self.stdout.print("\x1b[{};{}H", .{clear, col}) catch {};
             for (0..self.result_box.width-1) |_| self.stdout.print(" ", .{}) catch {};
         }
-        for (self.search_result, 0..) |is, idx| {
+
+        var idx: usize = 0;
+
+        if (self.selection_pos > self.result_box.height - 2) {
+            idx = self.selection_pos - (self.result_box.height-2);
+        }
+
+        while (idx < self.search_result.len and cur_row > self.result_box.y) : (idx +=1) {
             if (idx == self.selection_pos) {
-                self.stdout.print("\x1b[{};{}H\x1b[30;43m{s}\x1b[0m", .{cur_row, col, is.title}) catch {};
+                self.stdout.print("\x1b[{};{}H\x1b[30;43m{s}\x1b[0m", .{cur_row, col, self.search_result[idx].title}) catch {};
             }else {
-                self.stdout.print("\x1b[{};{}H{s}", .{cur_row, col, is.title}) catch {};
+                self.stdout.print("\x1b[{};{}H{s}", .{cur_row, col, self.search_result[idx].title}) catch {};
             }
             cur_row -= 1;
         }
-
         self.stdout.flush() catch {};
 
     }
