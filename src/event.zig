@@ -347,10 +347,18 @@ pub const screen = struct {
         try cleanSearch(self.stdout, max_width-1);
         try self.stdout.print("\x1b[{};{}H{any}", .{row_start+2, col_start, is.status});
 
+        var cur_row: usize = 4;
+
+        if (is.closed_at) |ca | {
+            try self.stdout.print("\x1b[{};{}H", .{row_start+3, col_start});
+            try cleanSearch(self.stdout, max_width-1);
+            try self.stdout.print("\x1b[{};{}H{s}", .{row_start+3, col_start, ca});
+            cur_row = 5;
+        }
+
         if (is.description) |d| {
 
             var idx: usize = 0;
-            var cur_row: usize = 4;
             var cur_col: usize = col_start;
 
             try self.stdout.print("\x1b[{};{}H", .{row_start+cur_row, col_start});

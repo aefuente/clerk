@@ -12,6 +12,7 @@ pub const Issue = struct {
     title: []u8,
     issue_type: IssueType,
     status: IssueStatus,
+    closed_at: ?[]u8,
     description: ?[]u8,
     file_path: ?[]u8,
 
@@ -22,6 +23,9 @@ pub const Issue = struct {
         try writer.interface.print("Title:\t\t{s}\n", .{self.title});
         try writer.interface.print("Type:\t\t{any}\n", .{self.issue_type});
         try writer.interface.print("Status:\t\t{any}\n", .{self.status});
+        if (self.closed_at) |ca| {
+            try writer.interface.print("Closed at:\t{s}\n", .{ca});
+        }
         if (self.description) |d| {
             try writer.interface.print("Description:\t{s}\n", .{d});
         }
@@ -32,6 +36,12 @@ pub const Issue = struct {
     pub fn deepCopy(allocator: Allocator, is: Issue) !Issue{
         const owned_title = try allocator.alloc(u8, is.title.len);
         @memcpy(owned_title, is.title);
+
+        var owned_closed_at: ?[]u8 = null;
+        if (is.closed_at) |d| {
+            owned_closed_at = try allocator.alloc(u8, d.len);
+            @memcpy(owned_closed_at.?, d);
+        }
 
         var owned_description: ?[]u8 = null;
         if (is.description) |d| {
@@ -48,6 +58,7 @@ pub const Issue = struct {
             .title = owned_title,
             .issue_type = is.issue_type,
             .status = is.status,
+            .closed_at = owned_closed_at,
             .description = owned_description,
             .file_path = owned_file_path,
         };
@@ -56,6 +67,11 @@ pub const Issue = struct {
 
     pub fn deinit(self: Issue, allocator: Allocator) void {
         allocator.free(self.title);
+
+        if (self.closed_at) |d| {
+            allocator.free(d);
+        }
+
         if (self.description) |d| {
             allocator.free(d);
         }
@@ -97,6 +113,7 @@ pub const Clerk = struct {
                 defer new_issue.deinit(allocator);
                 new_issue.status = .closed;
 
+                new_issue.closed_at = try allocGetTime(allocator);
                 try writeIssue(file, new_issue);
                 return;
             }else if (! isId and entry.kind == .directory){
@@ -117,6 +134,7 @@ pub const Clerk = struct {
 
                 if (std.mem.eql(u8, new_issue.title, identifier)){
                     new_issue.status = .closed;
+                    new_issue.closed_at = try allocGetTime(allocator);
 
                     try writeIssue(file, new_issue);
                     return;
@@ -221,6 +239,7 @@ pub const Clerk = struct {
             .title = arg.target orelse return error.NoTitle,
             .description = arg.description orelse "",
             .issue_type = arg.issue_type orelse IssueType.feature,
+            .closed_at = null,
             .status = IssueStatus.open,
             .file_path = null,
         };
@@ -364,6 +383,7 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
         .title = "",
         .issue_type = .feature,
         .status = .open,
+        .closed_at = null,
         .description = null,
         .file_path = null,
     };
@@ -396,6 +416,10 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
                     result.issue_type = try stringToIssueType(line[idx+2..]);
                 } else if (std.mem.eql(u8, line[0..idx], "status")) {
                     result.status = try stringToIssueStatus(line[idx+2..]);
+                } else if (std.mem.eql(u8, line[0..idx], "closed at")) {
+                    const owned_closed_at = try allocator.alloc(u8, line[idx+2..].len);
+                    @memcpy(owned_closed_at, line[idx+2..]);
+                    result.closed_at = owned_closed_at;
                 }
                 break;
             }
@@ -428,7 +452,12 @@ pub fn writeIssue(file: std.fs.File, issue: Issue) !void {
     }
     switch (issue.status) {
         .open => { _ = try writer.interface.write("status: open\n"); },
-        .closed => { _ = try writer.interface.write("status: closed\n"); }
+        .closed => {
+            _ = try writer.interface.write("status: closed\n"); 
+            if (issue.closed_at) |ca | {
+                _ = try writer.interface.print("closed at: {s}\n", .{ca}); 
+            }
+        }
     }
 
     _ = try writer.interface.write("---\n");
@@ -471,6 +500,22 @@ fn isClerkId(value: []const u8) bool {
     return true;
 }
 
+fn allocGetTime(allocator: Allocator) ![]u8 {
+    const time = try allocator.alloc(u8, TIME_STR_LENGTH-1);
+    const now: i64 = std.time.timestamp();
+
+    var tm: c.tm = undefined;
+    _ = c.localtime_r(@ptrCast( &now), &tm);
+
+    _ = c.strftime(
+        @ptrCast(time),
+        TIME_STR_LENGTH,
+        "%Y%m%d-%H%M%S",
+        &tm,
+    );
+    return time;
+
+}
 fn getTime(time: []u8) []const u8 {
     const now: i64 = std.time.timestamp();
 
