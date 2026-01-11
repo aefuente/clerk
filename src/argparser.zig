@@ -12,6 +12,7 @@ pub const Args = struct {
     issue_type: ?IssueType,
     today: bool = false,
     closed: bool = false,
+    from: ?[]u8,
 
     pub fn init(allocator: Allocator) !Args {
         const command_args = try std.process.argsAlloc(allocator);
@@ -25,6 +26,7 @@ pub const Args = struct {
             .issue_type = null,
             .today = false,
             .closed = false,
+            .from  = null,
         };
 
         try args.parse();
@@ -55,6 +57,7 @@ pub const Args = struct {
             try stdout.interface.print("\nFlags:\n", .{});
             try stdout.interface.print("\t-y, --today\t\tOnly list issues from current day\n", .{});
             try stdout.interface.print("\t-c, --closed\t\tOnly list closed issues\n", .{});
+            try stdout.interface.print("\t-f, --from\t\tList issues from date\n", .{});
             try stdout.interface.print("\nExamples:\n", .{});
             try stdout.interface.print("\tck open \"new feature\" -d \"makes it better\" -t feature\n", .{});
 
@@ -105,6 +108,13 @@ pub const Args = struct {
             std.mem.eql(u8, "-t", name)) {
             self.issue_type = try getIssueType(value);
         }
+        else if (std.mem.eql(u8, "--from", name) or
+            std.mem.eql(u8, "-f", name)) {
+            if (value.len < 8) {
+                return error.InvalidDate;
+            }
+            self.from = value;
+        }
     }
 
     fn setFlag(self: *Args, name: [:0]u8) error{NotFlag}!void {
@@ -135,7 +145,6 @@ fn getAction(value: [:0]u8) ?action {
     else if (std.mem.eql(u8, value, "delete")) { return action.delete; }
     return null;
 }
-
 
 fn getIssueType(value: [:0]u8) !IssueType {
     if (std.mem.eql(u8, value, "fix")) { return IssueType.fix; }

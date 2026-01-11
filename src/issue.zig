@@ -198,29 +198,29 @@ pub const Clerk = struct {
                 };
                 const path = try self.wd.realpathAlloc(allocator, file_path);
                 new_issue.file_path = path;
+                var should_append = true;
 
-                if (filter.closed and filter.today){
-                    if (std.mem.eql(u8, entry.name[0..8], time[0..8]) and new_issue.status == .closed) {
-                        try result.append(allocator, new_issue);
-                        continue;
-                    }
-                }else if (filter.closed) {
-                    if ( new_issue.status == .closed) {
-                        try result.append(allocator, new_issue);
-                        continue;
-                    }
-                }else if (filter.today) {
-                    if (std.mem.eql(u8, entry.name[0..8], time[0..8]) and new_issue.status == .open) {
-                        try result.append(allocator, new_issue);
-                        continue;
-                    }
-                }else { 
-                    if (new_issue.status == .open) {
-                        try result.append(allocator, new_issue);
-                        continue;
+                if (filter.closed and new_issue.status != .closed) {
+                    should_append = false;
+                }
+                if (! filter.closed and new_issue.status == .closed) {
+                    should_append = false;
+                }
+                if (filter.today and ! std.mem.eql(u8, entry.name[0..8], time[0..8])) {
+                    should_append = false;
+                }
+                if (filter.from) |date | {
+                    if (! std.mem.eql(u8, entry.name[0..8], date)) {
+                        should_append = false;
                     }
                 }
-                new_issue.deinit(allocator);
+
+                if (should_append) {
+                    try result.append(allocator, new_issue);
+                }else {
+                    new_issue.deinit(allocator);
+                }
+
             }else {
                 continue;
             }
@@ -535,4 +535,5 @@ fn getTime(time: []u8) []const u8 {
 pub const FilterOptions = struct {
     today: bool,
     closed: bool,
+    from: ?[]u8,
 };
