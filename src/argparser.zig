@@ -13,6 +13,7 @@ pub const Args = struct {
     today: bool = false,
     closed: bool = false,
     from: ?[]u8,
+    since: ?[]u8,
 
     pub fn init(allocator: Allocator) !Args {
         const command_args = try std.process.argsAlloc(allocator);
@@ -27,6 +28,7 @@ pub const Args = struct {
             .today = false,
             .closed = false,
             .from  = null,
+            .since  = null,
         };
 
         try args.parse();
@@ -58,6 +60,7 @@ pub const Args = struct {
             try stdout.interface.print("\t-y, --today\t\tOnly list issues from current day\n", .{});
             try stdout.interface.print("\t-c, --closed\t\tOnly list closed issues\n", .{});
             try stdout.interface.print("\t-f, --from\t\tList issues from date\n", .{});
+            try stdout.interface.print("\t-s, --since\t\tList issues since date\n", .{});
             try stdout.interface.print("\nExamples:\n", .{});
             try stdout.interface.print("\tck open \"new feature\" -d \"makes it better\" -t feature\n", .{});
 
@@ -107,13 +110,18 @@ pub const Args = struct {
         else if (std.mem.eql(u8, "--type", name) or
             std.mem.eql(u8, "-t", name)) {
             self.issue_type = try getIssueType(value);
-        }
-        else if (std.mem.eql(u8, "--from", name) or
+        } else if (std.mem.eql(u8, "--from", name) or
             std.mem.eql(u8, "-f", name)) {
             if (value.len < 8) {
                 return error.InvalidDate;
             }
             self.from = value;
+        } else if (std.mem.eql(u8, "--since", name) or
+            std.mem.eql(u8, "-s", name)) {
+            if (value.len < 8) {
+                return error.InvalidDate;
+            }
+            self.since = value;
         }
     }
 
