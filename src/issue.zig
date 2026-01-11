@@ -215,6 +215,14 @@ pub const Clerk = struct {
                     }
                 }
 
+                if (filter.since) |date | {
+                    const since = try std.fmt.parseInt(i32, date, 10);
+                    const entry_date = try std.fmt.parseInt(i32, entry.name[0..8],10);
+                    if (entry_date < since) {
+                        should_append = false;
+                    }
+                }
+
                 if (should_append) {
                     try result.append(allocator, new_issue);
                 }else {
@@ -536,4 +544,5 @@ pub const FilterOptions = struct {
     today: bool,
     closed: bool,
     from: ?[]u8,
+    since: ?[]u8,
 };
