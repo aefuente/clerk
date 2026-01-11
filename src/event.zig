@@ -129,7 +129,7 @@ pub const screen = struct {
         var read_buf: [STDIN_BUF_SIZE]u8 = undefined;
         var stdin = std.fs.File.stdin().reader(&read_buf);
 
-        var issues = try self.clerk.getIssues(allocator, .{ .closed = self.args.closed, .today = self.args.today });
+        var issues = try self.clerk.getIssues(allocator, .{ .closed = self.args.closed, .today = self.args.today, .from = self.args.from });
         defer issues.deinit(allocator);
 
         try self.updateScreen(allocator, array_list, issues);
@@ -184,7 +184,7 @@ pub const screen = struct {
                                         const f = try std.fs.openFileAbsolute(file_path, .{.mode =.read_write});
                                         try issue.closeIssue(allocator, f);
                                         issues.deinit(allocator);
-                                        issues = try self.clerk.getIssues(allocator, .{.closed = self.args.closed, .today = self.args.today});
+                                        issues = try self.clerk.getIssues(allocator, .{.closed = self.args.closed, .today = self.args.today, .from = self.args.from});
                                         if (self.selection_pos == self.search_result.len-1 and self.selection_pos > 0) {
                                             self.selection_pos -= 1;
                                         }
