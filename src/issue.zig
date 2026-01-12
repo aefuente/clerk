@@ -551,7 +551,7 @@ fn getTime(time: []u8) []const u8 {
 }
 
 pub fn FilterOptionsFromArgs(a: args.Args) FilterOptions {
-    var cf = false;
+    var cf = a.closed;
     if (a.closed_on) |_| {
         cf = true;
     }

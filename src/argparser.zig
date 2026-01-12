@@ -63,7 +63,7 @@ pub const Args = struct {
             try stdout.interface.print("\t-c, --closed\t\tOnly list closed issues\n", .{});
             try stdout.interface.print("\t-f, --from\t\tList issues from date\n", .{});
             try stdout.interface.print("\t-s, --since\t\tList issues since date\n", .{});
-            try stdout.interface.print("\t-o, --closed-on\tIssues that were closed on a specific date\n", .{});
+            try stdout.interface.print("\t-o, --closed-on\t\tIssues that were closed on a specific date\n", .{});
             try stdout.interface.print("\nExamples:\n", .{});
             try stdout.interface.print("\tck open \"new feature\" -d \"makes it better\" -t feature\n", .{});
 
