@@ -14,6 +14,7 @@ pub const Args = struct {
     closed: bool = false,
     from: ?[]u8,
     since: ?[]u8,
+    closed_on: ?[]u8,
 
     pub fn init(allocator: Allocator) !Args {
         const command_args = try std.process.argsAlloc(allocator);
@@ -29,6 +30,7 @@ pub const Args = struct {
             .closed = false,
             .from  = null,
             .since  = null,
+            .closed_on = null,
         };
 
         try args.parse();
@@ -61,6 +63,7 @@ pub const Args = struct {
             try stdout.interface.print("\t-c, --closed\t\tOnly list closed issues\n", .{});
             try stdout.interface.print("\t-f, --from\t\tList issues from date\n", .{});
             try stdout.interface.print("\t-s, --since\t\tList issues since date\n", .{});
+            try stdout.interface.print("\t-o, --closed-on\tIssues that were closed on a specific date\n", .{});
             try stdout.interface.print("\nExamples:\n", .{});
             try stdout.interface.print("\tck open \"new feature\" -d \"makes it better\" -t feature\n", .{});
 
@@ -122,6 +125,12 @@ pub const Args = struct {
                 return error.InvalidDate;
             }
             self.since = value;
+        } else if (std.mem.eql(u8, "--closed-on", name) or
+            std.mem.eql(u8, "-o", name)) {
+            if (value.len < 8) {
+                return error.InvalidDate;
+            }
+            self.closed_on = value;
         }
     }
 
