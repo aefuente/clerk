@@ -44,7 +44,8 @@ pub fn main() !void {
 
         },
         .list => {
-            const issues = try tracker.getIssues(gpa, .{.closed = args.closed, .today = args.today, .from = args.from, .since = args.since});
+            const options = clerk.issues.FilterOptionsFromArgs(args);
+            const issues = try tracker.getIssues(gpa, options);
             defer issues.deinit(gpa);
             for (issues.items) | issue| {
                 try issue.print();

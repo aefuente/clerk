@@ -200,6 +200,7 @@ pub const Clerk = struct {
                 new_issue.file_path = path;
                 var should_append = true;
 
+
                 if (filter.closed and new_issue.status != .closed) {
                     should_append = false;
                 }
@@ -211,6 +212,16 @@ pub const Clerk = struct {
                 }
                 if (filter.from) |date | {
                     if (! std.mem.eql(u8, entry.name[0..8], date)) {
+                        should_append = false;
+                    }
+                }
+
+                if (filter.closed_on) |date| {
+                    if (new_issue.closed_at) | ca | {
+                        if (! std.mem.eql(u8, date[0..8], ca[0..8])) {
+                            should_append = false;
+                        }
+                    }else {
                         should_append = false;
                     }
                 }
@@ -539,10 +550,23 @@ fn getTime(time: []u8) []const u8 {
     return time[0..TIME_STR_LENGTH-1];
 }
 
+pub fn FilterOptionsFromArgs(a: args.Args) FilterOptions {
+    var cf = false;
+    if (a.closed_on) |_| {
+        cf = true;
+    }
+
+    return .{ .today = a.today,
+        .closed = cf,
+        .from = a.from,
+        .since = a.since,
+        .closed_on = a.closed_on};
+}
 
 pub const FilterOptions = struct {
     today: bool,
     closed: bool,
     from: ?[]u8,
     since: ?[]u8,
+    closed_on: ?[]u8,
 };
