@@ -185,6 +185,7 @@ pub const screen = struct {
                                         const directory = std.fs.path.dirname(file_path) orelse continue;
                                         const identifier = std.fs.path.basename(directory);
                                         try self.clerk.closeIssue(allocator, identifier);
+                                        issues.deinit(allocator);
                                         issues = try self.clerk.getIssues(allocator, options);
                                         if (self.selection_pos == self.search_result.len-1 and self.selection_pos > 0) {
                                             self.selection_pos -= 1;
