@@ -182,8 +182,9 @@ pub const screen = struct {
                             if (lastcode == DELETE) {
                                 if (self.selection_pos < self.search_result.len) {
                                     if (self.search_result[self.selection_pos].file_path) |file_path| {
-                                        const f = try std.fs.openFileAbsolute(file_path, .{.mode =.read_write});
-                                        try issue.closeIssue(allocator, f);
+                                        const directory = std.fs.path.dirname(file_path) orelse continue;
+                                        const identifier = std.fs.path.basename(directory);
+                                        try self.clerk.closeIssue(allocator, identifier);
                                         issues = try self.clerk.getIssues(allocator, options);
                                         if (self.selection_pos == self.search_result.len-1 and self.selection_pos > 0) {
                                             self.selection_pos -= 1;

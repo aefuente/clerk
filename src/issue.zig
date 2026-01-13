@@ -350,6 +350,7 @@ pub fn makeClerkDirectory() !Dir {
     };
     return try git.openDir(CLERK_DIRECTORY_NAME, .{ .iterate = true });
 }
+
 pub fn closeIssue(allocator: Allocator, file: std.fs.File) !void {
     var read_buf: [1024]u8 = undefined;
     var reader = file.reader(&read_buf);
