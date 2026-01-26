@@ -10,14 +10,11 @@ pub fn getTerminalSize() !posix.winsize {
     return ws;
 }
 
-const BoxDimensions = struct {
-    col: u16,
-    row: u16
-};
+const BoxDimensions = struct { col: u16, row: u16 };
 
 fn getBoxSize(terminal_size: posix.winsize) BoxDimensions {
     return BoxDimensions{
-        .col = terminal_size.col-8,
+        .col = terminal_size.col - 8,
         .row = 6,
     };
 }
@@ -31,24 +28,23 @@ pub const Box = struct {
 };
 
 pub fn DrawBox(stdout: *std.Io.Writer, box: Box) !void {
-
     try stdout.print("\x1b(0", .{});
-    try stdout.print("\x1b[{};{}Hl", .{box.y, box.x});
+    try stdout.print("\x1b[{};{}Hl", .{ box.y, box.x });
     for (0..box.width) |_| try stdout.print("q", .{});
     try stdout.print("k", .{});
 
-    if (box.identifier) |id| { 
+    if (box.identifier) |id| {
         try stdout.print("\x1b(B", .{});
-        try stdout.print("\x1b[{};{}H {s} ", .{box.y, box.x - 1 + @divFloor(box.width, 2) - @divFloor(id.len,2), id});
+        try stdout.print("\x1b[{};{}H {s} ", .{ box.y, box.x - 1 + @divFloor(box.width, 2) - @divFloor(id.len, 2), id });
         try stdout.print("\x1b(0", .{});
     }
 
-    for (box.y+1..box.y + box.height) |i| {
-        try stdout.print("\x1b[{};{}Hx", .{ i , box.x});
+    for (box.y + 1..box.y + box.height) |i| {
+        try stdout.print("\x1b[{};{}Hx", .{ i, box.x });
         try stdout.print("\x1b[{};{}Hx", .{ i, box.x + box.width + 1 });
     }
 
-    try stdout.print("\x1b[{};{}Hm", .{box.y + box.height, box.x});
+    try stdout.print("\x1b[{};{}Hm", .{ box.y + box.height, box.x });
     for (0..box.width) |_| try stdout.print("q", .{});
     try stdout.print("j", .{});
     try stdout.print("\x1b(B", .{});
@@ -74,8 +70,4 @@ pub fn CalculatePreview(terminal_size: posix.winsize) Box {
     };
 }
 
-pub const SearchDetails = struct {
-    x: u16,
-    y: u16,
-    width: u16
-};
+pub const SearchDetails = struct { x: u16, y: u16, width: u16 };

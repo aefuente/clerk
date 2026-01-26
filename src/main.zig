@@ -13,11 +13,11 @@ pub fn main() !void {
         },
         else => {
             return err;
-        }
+        },
     };
     defer args.deinit(gpa);
 
-    var tracker = try clerk.Clerk.init();
+    var tracker = try clerk.Clerk.init(args.git_dir);
     defer tracker.deinit();
 
     if (args.action) |action| switch (action) {
@@ -25,29 +25,27 @@ pub fn main() !void {
             _ = try tracker.openIssue(args);
         },
         .close => {
-            if (args.target) | target| {
+            if (args.target) |target| {
                 try tracker.closeIssue(gpa, target);
-            }else {
+            } else {
                 std.debug.print("Missing target for close\n", .{});
                 return error.MissingTarget;
             }
         },
         .delete => {
-            if (args.target) | target| {
+            if (args.target) |target| {
                 try tracker.deleteIssue(gpa, target);
-            }else {
+            } else {
                 std.debug.print("Missing target for delete\n", .{});
                 return error.MissingTarget;
             }
         },
-        .edit => {
-
-        },
+        .edit => {},
         .list => {
             const options = clerk.issues.FilterOptionsFromArgs(args);
             const issues = try tracker.getIssues(gpa, options);
             defer issues.deinit(gpa);
-            for (issues.items) | issue| {
+            for (issues.items) |issue| {
                 try issue.print();
             }
         },

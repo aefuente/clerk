@@ -15,6 +15,7 @@ pub const Args = struct {
     from: ?[]u8,
     since: ?[]u8,
     closed_on: ?[]u8,
+    git_dir: bool = false,
 
     pub fn init(allocator: Allocator) !Args {
         const command_args = try std.process.argsAlloc(allocator);
@@ -28,8 +29,9 @@ pub const Args = struct {
             .issue_type = null,
             .today = false,
             .closed = false,
-            .from  = null,
-            .since  = null,
+            .git_dir = false,
+            .from = null,
+            .since = null,
             .closed_on = null,
         };
 
@@ -82,7 +84,7 @@ pub const Args = struct {
             arg_pos += 1;
         }
 
-        if ( arg_pos < self.arg_buf.len and ! isVariable(self.arg_buf[arg_pos])) {
+        if (arg_pos < self.arg_buf.len and !isVariable(self.arg_buf[arg_pos])) {
             self.target = self.arg_buf[arg_pos];
             arg_pos += 1;
         }
@@ -94,9 +96,9 @@ pub const Args = struct {
                     if (arg_pos + 1 >= self.arg_buf.len) {
                         return error.ExpectedValue;
                     }
-                    try self.setVariable(arg, self.arg_buf[arg_pos+1]);
+                    try self.setVariable(arg, self.arg_buf[arg_pos + 1]);
                     arg_pos += 1;
-                }else {
+                } else {
                     return error.NoMatchingOption;
                 }
             };
@@ -104,29 +106,32 @@ pub const Args = struct {
         }
     }
 
-
     fn setVariable(self: *Args, name: [:0]u8, value: [:0]u8) !void {
         if (std.mem.eql(u8, "--description", name) or
-            std.mem.eql(u8, "-d", name)) {
+            std.mem.eql(u8, "-d", name))
+        {
             self.description = value[0..value.len];
-        }
-        else if (std.mem.eql(u8, "--type", name) or
-            std.mem.eql(u8, "-t", name)) {
+        } else if (std.mem.eql(u8, "--type", name) or
+            std.mem.eql(u8, "-t", name))
+        {
             self.issue_type = try getIssueType(value);
         } else if (std.mem.eql(u8, "--from", name) or
-            std.mem.eql(u8, "-f", name)) {
+            std.mem.eql(u8, "-f", name))
+        {
             if (value.len < 8) {
                 return error.InvalidDate;
             }
             self.from = value;
         } else if (std.mem.eql(u8, "--since", name) or
-            std.mem.eql(u8, "-s", name)) {
+            std.mem.eql(u8, "-s", name))
+        {
             if (value.len < 8) {
                 return error.InvalidDate;
             }
             self.since = value;
         } else if (std.mem.eql(u8, "--closed-on", name) or
-            std.mem.eql(u8, "-o", name)) {
+            std.mem.eql(u8, "-o", name))
+        {
             if (value.len < 8) {
                 return error.InvalidDate;
             }
@@ -136,12 +141,14 @@ pub const Args = struct {
 
     fn setFlag(self: *Args, name: [:0]u8) error{NotFlag}!void {
         if (std.mem.eql(u8, "--today", name) or
-            std.mem.eql(u8, "-y", name)) { 
+            std.mem.eql(u8, "-y", name))
+        {
             self.today = true;
             return;
         }
         if (std.mem.eql(u8, "--closed", name) or
-            std.mem.eql(u8, "-c", name)) { 
+            std.mem.eql(u8, "-c", name))
+        {
             self.closed = true;
             return;
         }
@@ -151,23 +158,33 @@ pub const Args = struct {
     pub fn deinit(self: *Args, allocator: Allocator) void {
         process.argsFree(allocator, self.arg_buf);
     }
-
 };
 
 fn getAction(value: [:0]u8) ?action {
-    if (std.mem.eql(u8, value, "open")) { return action.open; }
-    else if (std.mem.eql(u8, value, "edit")) { return action.edit; }
-    else if (std.mem.eql(u8, value, "ls")) { return action.list; }
-    else if (std.mem.eql(u8, value, "close")) { return action.close; }
-    else if (std.mem.eql(u8, value, "delete")) { return action.delete; }
+    if (std.mem.eql(u8, value, "open")) {
+        return action.open;
+    } else if (std.mem.eql(u8, value, "edit")) {
+        return action.edit;
+    } else if (std.mem.eql(u8, value, "ls")) {
+        return action.list;
+    } else if (std.mem.eql(u8, value, "close")) {
+        return action.close;
+    } else if (std.mem.eql(u8, value, "delete")) {
+        return action.delete;
+    }
     return null;
 }
 
 fn getIssueType(value: [:0]u8) !IssueType {
-    if (std.mem.eql(u8, value, "fix")) { return IssueType.fix; }
-    else if (std.mem.eql(u8, value, "bug")) { return IssueType.bug; }
-    else if (std.mem.eql(u8, value, "chore")) { return IssueType.chore; }
-    else if (std.mem.eql(u8, value, "feature")) { return IssueType.feature; }
+    if (std.mem.eql(u8, value, "fix")) {
+        return IssueType.fix;
+    } else if (std.mem.eql(u8, value, "bug")) {
+        return IssueType.bug;
+    } else if (std.mem.eql(u8, value, "chore")) {
+        return IssueType.chore;
+    } else if (std.mem.eql(u8, value, "feature")) {
+        return IssueType.feature;
+    }
     return error.BadArgs;
 }
 
@@ -178,10 +195,4 @@ fn isVariable(arg: [:0]const u8) bool {
     return false;
 }
 
-const action = enum {
-    open,
-    edit,
-    list,
-    delete,
-    close
-};
+const action = enum { open, edit, list, delete, close };

@@ -31,26 +31,25 @@ pub fn run(allocator: Allocator, args: Args) !void {
         },
         else => {
             return err;
-        }
+        },
     };
 
     try stdout.interface.print("\x1b[2J\x1b[H", .{});
     try stdout.interface.flush();
 
     if (is) |i| {
-
         const file_path = i.file_path orelse return error.NoFilePath;
         const file = try toCstr(allocator, file_path);
         defer allocator.free(file);
 
         const visual_var = std.posix.getenv("VISUAL");
-        if (visual_var) |editor | {
-            return std.process.execv(allocator, &[_][]const u8{editor, file});
+        if (visual_var) |editor| {
+            return std.process.execv(allocator, &[_][]const u8{ editor, file });
         }
 
         const editor_var = std.posix.getenv("EDITOR");
-        if (editor_var) |editor | {
-            return std.process.execv(allocator, &[_][]const u8{editor, file});
+        if (editor_var) |editor| {
+            return std.process.execv(allocator, &[_][]const u8{ editor, file });
         }
 
         return error.NoEditor;
@@ -82,11 +81,7 @@ pub const screen = struct {
             .width = result.width,
         };
 
-        const search_pos = render.SearchDetails{
-            .x = s_box.x + 2,
-            .y = s_box.y + 1,
-            .width = s_box.width-2
-        };
+        const search_pos = render.SearchDetails{ .x = s_box.x + 2, .y = s_box.y + 1, .width = s_box.width - 2 };
 
         return screen{
             .stdout = stdout,
@@ -96,7 +91,7 @@ pub const screen = struct {
             .search_bounds = search_pos,
             .cursor_pos = 0,
             .selection_pos = 0,
-            .clerk = try issue.Clerk.init(),
+            .clerk = try issue.Clerk.init(args.git_dir),
             .terminal = try terminal.Terminal.init(),
             .search_result = try allocator.alloc(issue.Issue, 0),
             .args = args,
@@ -104,7 +99,6 @@ pub const screen = struct {
     }
 
     pub fn DrawBoxes(self: screen) !void {
-
         try self.stdout.print("\x1b[2J\x1b[H", .{});
         try render.DrawBox(self.stdout, self.result_box);
         try render.DrawBox(self.stdout, self.preview_box);
@@ -113,15 +107,14 @@ pub const screen = struct {
     }
 
     pub fn setCursorPositionSearch(self: screen) !void {
-        try self.stdout.print("\x1b[{};{}H", .{self.search_bounds.y, self.search_bounds.x+self.cursor_pos});
+        try self.stdout.print("\x1b[{};{}H", .{ self.search_bounds.y, self.search_bounds.x + self.cursor_pos });
         try self.stdout.flush();
     }
 
     pub fn userInteraction(
         self: *screen,
         allocator: std.mem.Allocator,
-        ) !?issue.Issue {
-
+    ) !?issue.Issue {
         var array_list = try std.ArrayList(u8).initCapacity(allocator, 10);
         defer array_list.deinit(allocator);
 
@@ -135,7 +128,7 @@ pub const screen = struct {
 
         try self.updateScreen(allocator, array_list, issues);
 
-        try self.stdout.print("\x1b[{};{}H", .{self.search_bounds.y, self.search_bounds.x});
+        try self.stdout.print("\x1b[{};{}H", .{ self.search_bounds.y, self.search_bounds.x });
         try self.stdout.flush();
 
         self.terminal.set_raw();
@@ -156,23 +149,17 @@ pub const screen = struct {
                 _ = array_list.orderedRemove(self.cursor_pos);
 
                 try self.updateScreen(allocator, array_list, issues);
-            }
-
-
-            else if (c == CTRL_C) {
+            } else if (c == CTRL_C) {
                 try self.stdout.print("\x1b[2J\x1b[H", .{});
                 try self.stdout.flush();
 
                 return error.CleanClose;
-            }
-
-            else if (c == '\n') {
-
+            } else if (c == '\n') {
                 try self.populateSearch(allocator, array_list.items, issues);
                 break;
             }
             // Escape sequence
-            else if (c == ESC){
+            else if (c == ESC) {
                 const code = try stdin.interface.takeByte();
                 if (code == BRACKET) {
                     const next_code = try stdin.interface.takeByte();
@@ -187,7 +174,7 @@ pub const screen = struct {
                                         try self.clerk.closeIssue(allocator, identifier);
                                         issues.deinit(allocator);
                                         issues = try self.clerk.getIssues(allocator, options);
-                                        if (self.selection_pos == self.search_result.len-1 and self.selection_pos > 0) {
+                                        if (self.selection_pos == self.search_result.len - 1 and self.selection_pos > 0) {
                                             self.selection_pos -= 1;
                                         }
                                         try self.updateScreen(allocator, array_list, issues);
@@ -215,7 +202,9 @@ pub const screen = struct {
                             continue;
                         },
                         UP_ARROW => {
-                            if (self.selection_pos+1 >= self.search_result.len) { continue; }
+                            if (self.selection_pos + 1 >= self.search_result.len) {
+                                continue;
+                            }
                             self.selection_pos += 1;
                             try self.updateScreen(allocator, array_list, issues);
                         },
@@ -225,13 +214,12 @@ pub const screen = struct {
                                 try self.updateScreen(allocator, array_list, issues);
                             }
                         },
-                        else => { }
+                        else => {},
                     }
                 }
-            }
-            else {
+            } else {
                 try array_list.insert(allocator, self.cursor_pos, c);
-                self.cursor_pos +=1;
+                self.cursor_pos += 1;
                 self.selection_pos = 0;
                 try self.updateScreen(allocator, array_list, issues);
             }
@@ -243,22 +231,21 @@ pub const screen = struct {
     }
 
     pub fn DrawLine(self: screen, line: []const u8) !void {
-
         var printable: []const u8 = line;
         if (line.len >= self.search_bounds.width) {
             const start = line.len - self.search_bounds.width;
             printable = line[start..];
         }
 
-        try self.stdout.print("\x1b[{};{}H", .{self.search_bounds.y, self.search_bounds.x});
-        try self.stdout.print("{s}",.{printable});
+        try self.stdout.print("\x1b[{};{}H", .{ self.search_bounds.y, self.search_bounds.x });
+        try self.stdout.print("{s}", .{printable});
         if (line.len <= self.search_bounds.width) {
             try cleanSearch(self.stdout, self.search_bounds.width - line.len);
         }
         if (self.cursor_pos >= self.search_bounds.width) {
-            try self.stdout.print("\x1b[{};{}H", .{self.search_bounds.y, self.search_bounds.x+self.search_bounds.width});
-        }else {
-            try self.stdout.print("\x1b[{};{}H", .{self.search_bounds.y, self.search_bounds.x+self.cursor_pos});
+            try self.stdout.print("\x1b[{};{}H", .{ self.search_bounds.y, self.search_bounds.x + self.search_bounds.width });
+        } else {
+            try self.stdout.print("\x1b[{};{}H", .{ self.search_bounds.y, self.search_bounds.x + self.cursor_pos });
         }
         try self.stdout.flush();
     }
@@ -275,7 +262,7 @@ pub const screen = struct {
         self.print_search();
     }
 
-    pub fn search(self: *screen, allocator: Allocator, query: []const u8, issues: issue.Issues) !void{
+    pub fn search(self: *screen, allocator: Allocator, query: []const u8, issues: issue.Issues) !void {
         for (self.search_result) |is| {
             is.deinit(allocator);
         }
@@ -285,7 +272,7 @@ pub const screen = struct {
             for (issues.items, 0..) |is, idx| {
                 self.search_result[idx] = try issue.Issue.deepCopy(allocator, is);
             }
-        }else {
+        } else {
             self.search_result = try fuzzy.filterAndSort(allocator, query, issues.items, 30);
         }
     }
@@ -296,90 +283,86 @@ pub const screen = struct {
         var clear = self.result_box.y + 1;
 
         while (clear < self.result_box.y + self.result_box.height) : (clear += 1) {
-            self.stdout.print("\x1b[{};{}H", .{clear, col}) catch {};
-            for (0..self.result_box.width-1) |_| self.stdout.print(" ", .{}) catch {};
+            self.stdout.print("\x1b[{};{}H", .{ clear, col }) catch {};
+            for (0..self.result_box.width - 1) |_| self.stdout.print(" ", .{}) catch {};
         }
 
         var idx: usize = 0;
 
         if (self.selection_pos > self.result_box.height - 2) {
-            idx = self.selection_pos - (self.result_box.height-2);
+            idx = self.selection_pos - (self.result_box.height - 2);
         }
 
-        while (idx < self.search_result.len and cur_row > self.result_box.y) : (idx +=1) {
+        while (idx < self.search_result.len and cur_row > self.result_box.y) : (idx += 1) {
             if (idx == self.selection_pos) {
-                self.stdout.print("\x1b[{};{}H\x1b[30;43m{s}\x1b[0m", .{cur_row, col, self.search_result[idx].title}) catch {};
-            }else {
-                self.stdout.print("\x1b[{};{}H{s}", .{cur_row, col, self.search_result[idx].title}) catch {};
+                self.stdout.print("\x1b[{};{}H\x1b[30;43m{s}\x1b[0m", .{ cur_row, col, self.search_result[idx].title }) catch {};
+            } else {
+                self.stdout.print("\x1b[{};{}H{s}", .{ cur_row, col, self.search_result[idx].title }) catch {};
             }
             cur_row -= 1;
         }
         self.stdout.flush() catch {};
-
     }
 
     pub fn printPreview(self: screen) !void {
         const col_start = self.preview_box.x + 2;
-        const max_width = self.preview_box.width - 2 ;
+        const max_width = self.preview_box.width - 2;
         const row_start = self.preview_box.y + 1;
         const max_height = self.preview_box.height - 2;
 
-
         for (0..max_height) |i| {
-            try self.stdout.print("\x1b[{};{}H", .{row_start+i, col_start});
+            try self.stdout.print("\x1b[{};{}H", .{ row_start + i, col_start });
             try cleanSearch(self.stdout, max_width);
         }
 
         if (self.selection_pos >= self.search_result.len) {
             return;
         }
-        const is =self.search_result[self.selection_pos];
+        const is = self.search_result[self.selection_pos];
 
         if (is.title.len >= max_width) {
-            try self.stdout.print("\x1b[{};{}H{s}", .{row_start, col_start, is.title[0..max_width]});
-        }else {
-            try self.stdout.print("\x1b[{};{}H{s}", .{row_start, col_start, is.title});
+            try self.stdout.print("\x1b[{};{}H{s}", .{ row_start, col_start, is.title[0..max_width] });
+        } else {
+            try self.stdout.print("\x1b[{};{}H{s}", .{ row_start, col_start, is.title });
             try cleanSearch(self.stdout, max_width - is.title.len);
         }
-        try self.stdout.print("\x1b[{};{}H", .{row_start+1, col_start});
-        try cleanSearch(self.stdout, max_width-1);
-        try self.stdout.print("\x1b[{};{}H{any}", .{row_start+1, col_start, is.issue_type});
+        try self.stdout.print("\x1b[{};{}H", .{ row_start + 1, col_start });
+        try cleanSearch(self.stdout, max_width - 1);
+        try self.stdout.print("\x1b[{};{}H{any}", .{ row_start + 1, col_start, is.issue_type });
 
-        try self.stdout.print("\x1b[{};{}H", .{row_start+2, col_start});
-        try cleanSearch(self.stdout, max_width-1);
-        try self.stdout.print("\x1b[{};{}H{any}", .{row_start+2, col_start, is.status});
+        try self.stdout.print("\x1b[{};{}H", .{ row_start + 2, col_start });
+        try cleanSearch(self.stdout, max_width - 1);
+        try self.stdout.print("\x1b[{};{}H{any}", .{ row_start + 2, col_start, is.status });
 
         var cur_row: usize = 4;
 
-        if (is.closed_at) |ca | {
-            try self.stdout.print("\x1b[{};{}H", .{row_start+3, col_start});
-            try cleanSearch(self.stdout, max_width-1);
-            try self.stdout.print("\x1b[{};{}H{s}", .{row_start+3, col_start, ca});
+        if (is.closed_at) |ca| {
+            try self.stdout.print("\x1b[{};{}H", .{ row_start + 3, col_start });
+            try cleanSearch(self.stdout, max_width - 1);
+            try self.stdout.print("\x1b[{};{}H{s}", .{ row_start + 3, col_start, ca });
             cur_row = 5;
         }
 
-
         if (is.description) |d| {
-            try self.stdout.print("\x1b[{};{}H", .{row_start+cur_row, col_start});
+            try self.stdout.print("\x1b[{};{}H", .{ row_start + cur_row, col_start });
             var cur_col: usize = col_start;
             const max_col = col_start + max_width;
             const max_row = self.preview_box.y + self.preview_box.height;
 
             var split_it = std.mem.splitAny(u8, d, " \n");
-            while (split_it.next()) | val | {
-                if (cur_row + row_start >= max_row - 1 ) {
+            while (split_it.next()) |val| {
+                if (cur_row + row_start >= max_row - 1) {
                     break;
                 }
 
                 if (cur_col + val.len >= max_col) {
                     cur_row += 1;
-                    try self.stdout.print("\x1b[{};{}H", .{row_start+cur_row, col_start});
+                    try self.stdout.print("\x1b[{};{}H", .{ row_start + cur_row, col_start });
                     cur_col = col_start;
                 }
                 try self.stdout.print("{s} ", .{val});
                 cur_col += val.len + 1;
             }
-
         }
         try self.stdout.flush();
     }
@@ -401,7 +384,6 @@ fn cleanSearch(writer: *std.Io.Writer, n: usize) !void {
 fn toCstr(allocator: Allocator, str: []const u8) ![]const u8 {
     var cstr: []u8 = try allocator.alloc(u8, str.len + 1);
     @memcpy(cstr[0..str.len], str);
-    cstr[str.len]  = 0;
+    cstr[str.len] = 0;
     return cstr;
 }
-

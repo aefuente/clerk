@@ -8,12 +8,12 @@ pub fn filterAndSort(allocator: Allocator, query: []const u8, candidates: []issu
     defer tmp.deinit(allocator);
     const norm_query = try normalize(allocator, query);
     defer allocator.free(norm_query);
-    for (candidates, 0..)  |c, idx| {
+    for (candidates, 0..) |c, idx| {
         const norm_title = try normalize(allocator, c.title);
         defer allocator.free(norm_title);
-        const s =try scoreTitle(allocator, norm_query, norm_title);
+        const s = try scoreTitle(allocator, norm_query, norm_title);
         if (s > threshold) {
-            try tmp.append(allocator, FuzzyMatch{.issue = try issue.Issue.deepCopy(allocator, candidates[idx]), .score = s});
+            try tmp.append(allocator, FuzzyMatch{ .issue = try issue.Issue.deepCopy(allocator, candidates[idx]), .score = s });
         }
     }
 
@@ -25,7 +25,7 @@ pub fn filterAndSort(allocator: Allocator, query: []const u8, candidates: []issu
     return result;
 }
 
-fn normalize(allocator: Allocator, text: []const u8) ![]u8{ 
+fn normalize(allocator: Allocator, text: []const u8) ![]u8 {
     var title = try allocator.alloc(u8, text.len);
     var i: usize = 0;
 
@@ -53,9 +53,9 @@ fn scoreTitle(
         }
     }
 
-    while (query_it.next()) |q_token | {
+    while (query_it.next()) |q_token| {
         if (std.mem.indexOf(u8, norm_title, q_token) != null) {
-                score += 10;
+            score += 10;
         }
     }
 
@@ -79,7 +79,9 @@ fn scoreTitle(
 }
 
 fn max(a: usize, b: usize) usize {
-    if (a > b) {return a;}
+    if (a > b) {
+        return a;
+    }
     return b;
 }
 
@@ -95,31 +97,30 @@ fn fuzzyScore(
 }
 
 pub fn LevenshteinDistance(allocator: Allocator, a: []const u8, b: []const u8) !usize {
-
     const m = a.len;
     const n = b.len;
-    var prev_row = try allocator.alloc(usize, n+1);
+    var prev_row = try allocator.alloc(usize, n + 1);
     defer allocator.free(prev_row);
 
-    for (0..n+1) | i | {
+    for (0..n + 1) |i| {
         prev_row[i] = i;
     }
 
-    var cur_row = try allocator.alloc(usize, n+1);
+    var cur_row = try allocator.alloc(usize, n + 1);
     defer allocator.free(cur_row);
 
-    for (1..m+1) | i | {
+    for (1..m + 1) |i| {
         cur_row[0] = i;
-        for (1..n+1) | j | {
-            if (std.ascii.toLower(a[i-1]) == std.ascii.toLower(b[j-1])) {
-                cur_row[j] = prev_row[j-1];
-            }else {
-                var min = cur_row[j-1];
+        for (1..n + 1) |j| {
+            if (std.ascii.toLower(a[i - 1]) == std.ascii.toLower(b[j - 1])) {
+                cur_row[j] = prev_row[j - 1];
+            } else {
+                var min = cur_row[j - 1];
                 if (min > prev_row[j]) {
                     min = prev_row[j];
                 }
-                if (min > prev_row[j-1]){
-                    min = prev_row[j-1];
+                if (min > prev_row[j - 1]) {
+                    min = prev_row[j - 1];
                 }
                 cur_row[j] = 1 + min;
             }
@@ -133,7 +134,6 @@ const FuzzyMatch = struct {
     issue: issue.Issue,
     score: usize,
 };
-
 
 fn cmp(ctx: context, lhs: FuzzyMatch, rhs: FuzzyMatch) bool {
     _ = ctx;

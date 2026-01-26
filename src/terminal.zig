@@ -30,7 +30,7 @@ pub const Terminal = struct {
         return Terminal{
             .raw_settings = raw_settings,
             .cooked_settings = cooked_settings,
-            .tty_file =  tty_file,
+            .tty_file = tty_file,
         };
     }
 

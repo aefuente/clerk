@@ -30,10 +30,9 @@ pub const Issue = struct {
             try writer.interface.print("Description:\t{s}\n", .{d});
         }
         try writer.interface.flush();
-
     }
 
-    pub fn deepCopy(allocator: Allocator, is: Issue) !Issue{
+    pub fn deepCopy(allocator: Allocator, is: Issue) !Issue {
         const owned_title = try allocator.alloc(u8, is.title.len);
         @memcpy(owned_title, is.title);
 
@@ -62,7 +61,6 @@ pub const Issue = struct {
             .description = owned_description,
             .file_path = owned_file_path,
         };
-
     }
 
     pub fn deinit(self: Issue, allocator: Allocator) void {
@@ -84,9 +82,9 @@ pub const Issue = struct {
 pub const Clerk = struct {
     wd: Dir,
 
-    pub fn init() !Clerk{
+    pub fn init(git_dir: bool) !Clerk {
         return Clerk{
-            .wd = try makeClerkDirectory(),
+            .wd = try makeClerkDirectory(git_dir),
         };
     }
 
@@ -98,17 +96,21 @@ pub const Clerk = struct {
         const isId = isClerkId(identifier);
         var dir_iterator = self.wd.iterate();
 
-        while (try dir_iterator.next()) |entry | {
+        while (try dir_iterator.next()) |entry| {
             if (isId and entry.kind == .directory and std.mem.eql(u8, entry.name, identifier)) {
-                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, ISSUE_FILE_NAME});
+                const file_path = try std.fs.path.join(allocator, &[_][]const u8{ entry.name, ISSUE_FILE_NAME });
                 defer allocator.free(file_path);
 
-                const file = try self.wd.openFile(file_path, .{.mode = .read_write});
+                const file = try self.wd.openFile(file_path, .{ .mode = .read_write });
                 defer file.close();
 
-                var new_issue = readIssue(allocator, file) catch |err| switch(err) {
-                    error.Parsing => {continue;},
-                    else => { return err; }
+                var new_issue = readIssue(allocator, file) catch |err| switch (err) {
+                    error.Parsing => {
+                        continue;
+                    },
+                    else => {
+                        return err;
+                    },
                 };
                 defer new_issue.deinit(allocator);
                 new_issue.status = .closed;
@@ -116,15 +118,19 @@ pub const Clerk = struct {
                 new_issue.closed_at = try allocGetTime(allocator);
                 try writeIssue(file, new_issue);
                 return;
-            }else if (! isId and entry.kind == .directory){
-                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, ISSUE_FILE_NAME});
+            } else if (!isId and entry.kind == .directory) {
+                const file_path = try std.fs.path.join(allocator, &[_][]const u8{ entry.name, ISSUE_FILE_NAME });
                 defer allocator.free(file_path);
-                const file = try self.wd.openFile(file_path, .{.mode = .read_write});
+                const file = try self.wd.openFile(file_path, .{ .mode = .read_write });
                 defer file.close();
 
-                var new_issue = readIssue(allocator, file) catch |err| switch(err) {
-                    error.Parsing => {continue;},
-                    else => { return err; }
+                var new_issue = readIssue(allocator, file) catch |err| switch (err) {
+                    error.Parsing => {
+                        continue;
+                    },
+                    else => {
+                        return err;
+                    },
                 };
                 defer new_issue.deinit(allocator);
 
@@ -132,7 +138,7 @@ pub const Clerk = struct {
                     continue;
                 }
 
-                if (std.mem.eql(u8, new_issue.title, identifier)){
+                if (std.mem.eql(u8, new_issue.title, identifier)) {
                     new_issue.status = .closed;
                     new_issue.closed_at = try allocGetTime(allocator);
 
@@ -148,35 +154,33 @@ pub const Clerk = struct {
         const isId = isClerkId(identifier);
         var dir_iterator = self.wd.iterate();
 
-        while (try dir_iterator.next()) |entry | {
+        while (try dir_iterator.next()) |entry| {
             if (isId and entry.kind == .directory and std.mem.eql(u8, entry.name, identifier)) {
                 try self.wd.deleteTree(entry.name);
                 return;
-            }else if (! isId and entry.kind == .directory){
-                const file_path = try std.fs.path.join(
-                    allocator, 
-                    &[_][]const u8{
-                        entry.name, 
-                        ISSUE_FILE_NAME
-                });
+            } else if (!isId and entry.kind == .directory) {
+                const file_path = try std.fs.path.join(allocator, &[_][]const u8{ entry.name, ISSUE_FILE_NAME });
                 defer allocator.free(file_path);
-                const file = try self.wd.openFile(file_path, .{.mode = .read_write});
+                const file = try self.wd.openFile(file_path, .{ .mode = .read_write });
                 defer file.close();
 
-                var new_issue = readIssue(allocator, file) catch |err| switch(err) {
-                    error.Parsing => {continue;},
-                    else => { return err; }
+                var new_issue = readIssue(allocator, file) catch |err| switch (err) {
+                    error.Parsing => {
+                        continue;
+                    },
+                    else => {
+                        return err;
+                    },
                 };
                 defer new_issue.deinit(allocator);
 
-                if (std.mem.eql(u8, new_issue.title, identifier)){
+                if (std.mem.eql(u8, new_issue.title, identifier)) {
                     try self.wd.deleteTree(entry.name);
                     return;
                 }
             }
         }
         return error.IssueNotFound;
-
     }
 
     pub fn getIssues(self: *Clerk, allocator: Allocator, filter: FilterOptions) !Issues {
@@ -186,49 +190,52 @@ pub const Clerk = struct {
         const time = getTime(&time_buf);
 
         var dir_iterator = self.wd.iterate();
-        while (try dir_iterator.next()) |entry | {
+        while (try dir_iterator.next()) |entry| {
             if (entry.kind == .directory and isClerkId(entry.name)) {
-                const file_path = try std.fs.path.join(allocator, &[_][]const u8{entry.name, ISSUE_FILE_NAME});
+                const file_path = try std.fs.path.join(allocator, &[_][]const u8{ entry.name, ISSUE_FILE_NAME });
                 defer allocator.free(file_path);
-                const file = try self.wd.openFile(file_path, .{.mode = .read_only});
+                const file = try self.wd.openFile(file_path, .{ .mode = .read_only });
                 defer file.close();
-                var new_issue = readIssue(allocator, file) catch |err| switch(err) {
-                    error.Parsing => {continue;},
-                    else => { return err; }
+                var new_issue = readIssue(allocator, file) catch |err| switch (err) {
+                    error.Parsing => {
+                        continue;
+                    },
+                    else => {
+                        return err;
+                    },
                 };
                 const path = try self.wd.realpathAlloc(allocator, file_path);
                 new_issue.file_path = path;
                 var should_append = true;
 
-
                 if (filter.closed and new_issue.status != .closed) {
                     should_append = false;
                 }
-                if (! filter.closed and new_issue.status == .closed) {
+                if (!filter.closed and new_issue.status == .closed) {
                     should_append = false;
                 }
-                if (filter.today and ! std.mem.eql(u8, entry.name[0..8], time[0..8])) {
+                if (filter.today and !std.mem.eql(u8, entry.name[0..8], time[0..8])) {
                     should_append = false;
                 }
-                if (filter.from) |date | {
-                    if (! std.mem.eql(u8, entry.name[0..8], date)) {
+                if (filter.from) |date| {
+                    if (!std.mem.eql(u8, entry.name[0..8], date)) {
                         should_append = false;
                     }
                 }
 
                 if (filter.closed_on) |date| {
-                    if (new_issue.closed_at) | ca | {
-                        if (! std.mem.eql(u8, date[0..8], ca[0..8])) {
+                    if (new_issue.closed_at) |ca| {
+                        if (!std.mem.eql(u8, date[0..8], ca[0..8])) {
                             should_append = false;
                         }
-                    }else {
+                    } else {
                         should_append = false;
                     }
                 }
 
-                if (filter.since) |date | {
+                if (filter.since) |date| {
                     const since = try std.fmt.parseInt(i32, date, 10);
-                    const entry_date = try std.fmt.parseInt(i32, entry.name[0..8],10);
+                    const entry_date = try std.fmt.parseInt(i32, entry.name[0..8], 10);
                     if (entry_date < since) {
                         should_append = false;
                     }
@@ -236,15 +243,14 @@ pub const Clerk = struct {
 
                 if (should_append) {
                     try result.append(allocator, new_issue);
-                }else {
+                } else {
                     new_issue.deinit(allocator);
                 }
-
-            }else {
+            } else {
                 continue;
             }
         }
-        return Issues{.items = try result.toOwnedSlice(allocator)};
+        return Issues{ .items = try result.toOwnedSlice(allocator) };
     }
 
     pub fn openIssue(self: *Clerk, arg: args.Args) ![]const u8 {
@@ -281,15 +287,11 @@ pub const Issues = struct {
     }
 };
 
-
 const DirIterator = struct {
     first: bool,
     path: []const u8,
-    pub fn init(path: []const u8) DirIterator{
-        return DirIterator{
-            .first = true,
-            .path = path
-        };
+    pub fn init(path: []const u8) DirIterator {
+        return DirIterator{ .first = true, .path = path };
     }
 
     pub fn next(self: *DirIterator) ?[]const u8 {
@@ -303,52 +305,66 @@ const DirIterator = struct {
         }
         return self.path;
     }
-
 };
 fn getGitDirectory() !Dir {
     var dir_buf: [4096]u8 = undefined;
     const dir_path = try std.process.getCwd(&dir_buf);
     var iterator = DirIterator.init(dir_path);
 
-    while (iterator.next()) |value | {
-        if (std.mem.eql(u8, dir_buf[value.len-5..value.len], ".git")) {
+    while (iterator.next()) |value| {
+        if (std.mem.eql(u8, dir_buf[value.len - 5 .. value.len], ".git")) {
             return try std.fs.openDirAbsolute(dir_buf[0..value.len], .{});
         }
-        @memcpy(dir_buf[value.len..value.len+5], "/.git");
-        if (std.fs.openDirAbsolute(dir_buf[0..value.len+5], .{})) |dir | {
+        @memcpy(dir_buf[value.len .. value.len + 5], "/.git");
+        if (std.fs.openDirAbsolute(dir_buf[0 .. value.len + 5], .{})) |dir| {
             return dir;
-        }else |err| switch (err) {
+        } else |err| switch (err) {
             error.FileNotFound => {
                 continue;
             },
             else => {
                 return err;
-            }
+            },
         }
     }
     return error.NoGitDirectory;
 }
 
-pub fn makeClerkDirectory() !Dir {
-    var git = getGitDirectory() catch |err | switch (err) {
-        error.NoGitDirectory => {
-            std.fs.cwd().makeDir(CLERK_DIRECTORY_NAME) catch |e | switch (e) {
-            error.PathAlreadyExists => { },
-            else => {return e;}
+pub fn makeClerkDirectory(git_dir: bool) !Dir {
+    if (git_dir) {
+        var git = getGitDirectory() catch |err| switch (err) {
+            error.NoGitDirectory => {
+                std.fs.cwd().makeDir(CLERK_DIRECTORY_NAME) catch |e| switch (e) {
+                    error.PathAlreadyExists => {},
+                    else => {
+                        return e;
+                    },
+                };
+                return try std.fs.cwd().openDir(CLERK_DIRECTORY_NAME, .{ .iterate = true });
+            },
+            else => {
+                return err;
+            },
         };
-            return try std.fs.cwd().openDir(CLERK_DIRECTORY_NAME, .{.iterate = true});
-        },
-        else => {
-            return err;
-        }
-    };
-    defer git.close();
-
-    git.makeDir(CLERK_DIRECTORY_NAME) catch |err | switch (err) {
-        error.PathAlreadyExists => { },
-        else => {return err;}
-    };
-    return try git.openDir(CLERK_DIRECTORY_NAME, .{ .iterate = true });
+        defer git.close();
+        git.makeDir(CLERK_DIRECTORY_NAME) catch |err| switch (err) {
+            error.PathAlreadyExists => {},
+            else => {
+                return err;
+            },
+        };
+        return try git.openDir(CLERK_DIRECTORY_NAME, .{ .iterate = true });
+    } else {
+        var cwd = try std.fs.cwd().openDir("./", .{ .iterate = true });
+        cwd.makeDir(CLERK_DIRECTORY_NAME) catch |err| switch (err) {
+            error.PathAlreadyExists => {},
+            else => {
+                return err;
+            },
+        };
+        defer cwd.close();
+        return try cwd.openDir(CLERK_DIRECTORY_NAME, .{ .iterate = true });
+    }
 }
 
 pub fn closeIssue(allocator: Allocator, file: std.fs.File) !void {
@@ -363,14 +379,14 @@ pub fn closeIssue(allocator: Allocator, file: std.fs.File) !void {
     defer array_list.deinit(allocator);
 
     var idx: usize = 0;
-    while (idx+9 < array_list.items.len) : (idx+=1){
-        if (array_list.items[idx] == '\n' and std.mem.eql(u8, "status: ", array_list.items[idx+1..idx+9])){
+    while (idx + 9 < array_list.items.len) : (idx += 1) {
+        if (array_list.items[idx] == '\n' and std.mem.eql(u8, "status: ", array_list.items[idx + 1 .. idx + 9])) {
             idx = idx + 9;
             break;
         }
     }
 
-    if (std.mem.eql(u8, array_list.items[idx..idx+4], "open")) {
+    if (std.mem.eql(u8, array_list.items[idx .. idx + 4], "open")) {
         try array_list.replaceRange(allocator, idx, 4, "closed");
     }
 
@@ -411,7 +427,7 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
 
     _ = try reader.interface.streamDelimiter(&allocating.writer, '\n');
     const first_line = allocating.written();
-    if (! std.mem.eql(u8, "---", first_line)) {
+    if (!std.mem.eql(u8, "---", first_line)) {
         return error.Parsing;
     }
     reader.interface.toss(1);
@@ -429,16 +445,16 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
         for (line, 0..) |ch, idx| {
             if (ch == ':') {
                 if (std.mem.eql(u8, line[0..idx], "title")) {
-                    const owned_title = try allocator.alloc(u8, line[idx+2..].len);
-                    @memcpy(owned_title, line[idx+2..]);
+                    const owned_title = try allocator.alloc(u8, line[idx + 2 ..].len);
+                    @memcpy(owned_title, line[idx + 2 ..]);
                     result.title = owned_title;
                 } else if (std.mem.eql(u8, line[0..idx], "type")) {
-                    result.issue_type = try stringToIssueType(line[idx+2..]);
+                    result.issue_type = try stringToIssueType(line[idx + 2 ..]);
                 } else if (std.mem.eql(u8, line[0..idx], "status")) {
-                    result.status = try stringToIssueStatus(line[idx+2..]);
+                    result.status = try stringToIssueStatus(line[idx + 2 ..]);
                 } else if (std.mem.eql(u8, line[0..idx], "closed at")) {
-                    const owned_closed_at = try allocator.alloc(u8, line[idx+2..].len);
-                    @memcpy(owned_closed_at, line[idx+2..]);
+                    const owned_closed_at = try allocator.alloc(u8, line[idx + 2 ..].len);
+                    @memcpy(owned_closed_at, line[idx + 2 ..]);
                     result.closed_at = owned_closed_at;
                 }
                 break;
@@ -446,7 +462,7 @@ pub fn readIssue(allocator: Allocator, file: std.fs.File) !Issue {
         }
         reader.interface.toss(1);
         allocating.clearRetainingCapacity();
-    }else |err |{
+    } else |err| {
         return err;
     }
     const len = try reader.interface.streamRemaining(&allocating.writer);
@@ -465,40 +481,61 @@ pub fn writeIssue(file: std.fs.File, issue: Issue) !void {
     try writer.interface.print("---\ntitle: {s}\n", .{issue.title});
 
     switch (issue.issue_type) {
-        .fix => { _ = try writer.interface.write("type: fix\n"); },
-        .bug => { _ = try writer.interface.write("type: bug\n"); },
-        .chore => { _ = try writer.interface.write("type: chore\n"); },
-        .feature => { _ = try writer.interface.write("type: feature\n"); },
+        .fix => {
+            _ = try writer.interface.write("type: fix\n");
+        },
+        .bug => {
+            _ = try writer.interface.write("type: bug\n");
+        },
+        .chore => {
+            _ = try writer.interface.write("type: chore\n");
+        },
+        .feature => {
+            _ = try writer.interface.write("type: feature\n");
+        },
     }
     switch (issue.status) {
-        .open => { _ = try writer.interface.write("status: open\n"); },
+        .open => {
+            _ = try writer.interface.write("status: open\n");
+        },
         .closed => {
-            _ = try writer.interface.write("status: closed\n"); 
-            if (issue.closed_at) |ca | {
-                _ = try writer.interface.print("closed at: {s}\n", .{ca}); 
+            _ = try writer.interface.write("status: closed\n");
+            if (issue.closed_at) |ca| {
+                _ = try writer.interface.print("closed at: {s}\n", .{ca});
             }
-        }
+        },
     }
 
     _ = try writer.interface.write("---\n");
     if (issue.description) |d| {
         _ = try writer.interface.write(d);
-    } 
+    }
     try writer.interface.flush();
 }
 
-pub fn stringToIssueType(value: []const u8) error{Parsing}!IssueType{
-    if (std.mem.eql(u8, value, "fix")) {return .fix; }
-    if (std.mem.eql(u8, value, "bug")) {return .bug; }
-    if (std.mem.eql(u8, value, "chore")) {return .chore; }
-    if (std.mem.eql(u8, value, "feature")) {return .feature; }
+pub fn stringToIssueType(value: []const u8) error{Parsing}!IssueType {
+    if (std.mem.eql(u8, value, "fix")) {
+        return .fix;
+    }
+    if (std.mem.eql(u8, value, "bug")) {
+        return .bug;
+    }
+    if (std.mem.eql(u8, value, "chore")) {
+        return .chore;
+    }
+    if (std.mem.eql(u8, value, "feature")) {
+        return .feature;
+    }
     return error.Parsing;
 }
 
-
-pub fn stringToIssueStatus(value: []const u8) error{Parsing}!IssueStatus{
-    if (std.mem.eql(u8, value, "open")) {return .open; }
-    if (std.mem.eql(u8, value, "closed")) {return .closed; }
+pub fn stringToIssueStatus(value: []const u8) error{Parsing}!IssueStatus {
+    if (std.mem.eql(u8, value, "open")) {
+        return .open;
+    }
+    if (std.mem.eql(u8, value, "closed")) {
+        return .closed;
+    }
     return error.Parsing;
 }
 
@@ -507,25 +544,31 @@ fn isClerkId(value: []const u8) bool {
 
     var idx: usize = 0;
     while (idx < 8) : (idx += 1) {
-        if (! std.ascii.isDigit(value[idx])) { return false;}
+        if (!std.ascii.isDigit(value[idx])) {
+            return false;
+        }
     }
 
-    if (value[idx] != '-') {return false;}
-    idx +=1;
+    if (value[idx] != '-') {
+        return false;
+    }
+    idx += 1;
 
     while (idx < 15) : (idx += 1) {
-        if (! std.ascii.isDigit(value[idx])) { return false;}
+        if (!std.ascii.isDigit(value[idx])) {
+            return false;
+        }
     }
 
     return true;
 }
 
 fn allocGetTime(allocator: Allocator) ![]u8 {
-    const time = try allocator.alloc(u8, TIME_STR_LENGTH-1);
+    const time = try allocator.alloc(u8, TIME_STR_LENGTH - 1);
     const now: i64 = std.time.timestamp();
 
     var tm: c.tm = undefined;
-    _ = c.localtime_r(@ptrCast( &now), &tm);
+    _ = c.localtime_r(@ptrCast(&now), &tm);
 
     _ = c.strftime(
         @ptrCast(time),
@@ -534,13 +577,12 @@ fn allocGetTime(allocator: Allocator) ![]u8 {
         &tm,
     );
     return time;
-
 }
 fn getTime(time: []u8) []const u8 {
     const now: i64 = std.time.timestamp();
 
     var tm: c.tm = undefined;
-    _ = c.localtime_r(@ptrCast( &now), &tm);
+    _ = c.localtime_r(@ptrCast(&now), &tm);
 
     _ = c.strftime(
         @ptrCast(time),
@@ -548,7 +590,7 @@ fn getTime(time: []u8) []const u8 {
         "%Y%m%d-%H%M%S",
         &tm,
     );
-    return time[0..TIME_STR_LENGTH-1];
+    return time[0 .. TIME_STR_LENGTH - 1];
 }
 
 pub fn FilterOptionsFromArgs(a: args.Args) FilterOptions {
@@ -557,11 +599,7 @@ pub fn FilterOptionsFromArgs(a: args.Args) FilterOptions {
         cf = true;
     }
 
-    return .{ .today = a.today,
-        .closed = cf,
-        .from = a.from,
-        .since = a.since,
-        .closed_on = a.closed_on};
+    return .{ .today = a.today, .closed = cf, .from = a.from, .since = a.since, .closed_on = a.closed_on };
 }
 
 pub const FilterOptions = struct {
