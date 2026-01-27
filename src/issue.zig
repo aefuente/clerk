@@ -113,6 +113,10 @@ pub const Clerk = struct {
                     },
                 };
                 defer new_issue.deinit(allocator);
+
+                if (new_issue.status == .closed) {
+                    return error.AlreadyClosed;
+                }
                 new_issue.status = .closed;
 
                 new_issue.closed_at = try allocGetTime(allocator);
@@ -134,11 +138,11 @@ pub const Clerk = struct {
                 };
                 defer new_issue.deinit(allocator);
 
-                if (new_issue.status == .closed) {
-                    continue;
-                }
+                if (std.mem.eql(u8, new_issue.title, identifier)){
+                    if (new_issue.status == .closed) {
+                        return error.AlreadyClosed;
+                    }
 
-                if (std.mem.eql(u8, new_issue.title, identifier)) {
                     new_issue.status = .closed;
                     new_issue.closed_at = try allocGetTime(allocator);
 
